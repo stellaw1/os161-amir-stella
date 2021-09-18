@@ -1,0 +1,134 @@
+// Step 4 ----------------------------------------------------------------------
+
+//sys161 output
+
+sys161: System/161 release 2.0.3, compiled Sep 14 2021 00:42:30
+
+OS/161 base system version 1.99.08
+Copyright (c) 2000, 2001-2005, 2008-2011, 2013, 2014
+   President and Fellows of Harvard College.  All rights reserved.
+
+Put-your-group-name-here's system version 0 (DUMBVM #1)
+
+292k physical memory available
+Device probe...
+lamebus0 (system main bus)
+emu0 at lamebus0
+ltrace0 at lamebus0
+ltimer0 at lamebus0
+beep0 at ltimer0
+rtclock0 at ltimer0
+lrandom0 at lamebus0
+random0 at lrandom0
+lhd0 at lamebus0
+lhd1 at lamebus0
+lser0 at lamebus0
+con0 at lser0
+
+cpu0: MIPS/161 (System/161 2.x) features 0x0
+OS/161 kernel [? for menu]:
+
+
+// git log output
+
+commit 306e9e12b3d7a4bfa06f9598e500214baec82540 (HEAD -> master, origin/master, origin/HEAD)
+Author: Stella Wang <stella01wang@gmail.com>
+Date:   Wed Sep 15 12:44:33 2021 -0700
+
+    adds git ignore
+
+commit 10deaefd7b36aa42ff02f6a8b5c24e9a2de6a953
+Author: Stella Wang <stella01wang@gmail.com>
+Date:   Mon Sep 13 16:34:19 2021 -0700
+
+    test edit readme
+
+commit 077d3e5c61eef01257d7c9a72c70fdef0ad95774
+Author: Stella Wang <stella01wang@gmail.com>
+Date:   Mon Sep 13 16:16:10 2021 -0700
+
+    restructure directory
+
+commit 32fc928f2608dfea714c79bcff47886b459ed10f
+Author: Stella Wang <stella01wang@gmail.com>
+Date:   Mon Sep 13 16:00:20 2021 -0700
+
+    test edit readme
+
+commit a5e8d8993e3be994dff3fc64921d405bacf14495
+Author: Stella Wang <stella01wang@gmail.com>
+Date:   Wed Sep 15 12:52:04 2021 -0700
+
+    adds readme
+
+commit d685d8c8c27066ab8fb9d6d86fdaa01b3dc89445
+Author: Stella Wang <stella01wang@gmail.com>
+Date:   Wed Sep 15 12:57:29 2021 -0700
+
+    initial commit of os161 for CPEN331
+
+
+// git tag output
+
+asst1-start
+
+
+
+// Step 5 -----------------------------------------------------------------------
+
+// Question 1
+First line of OS/161 code that is executed when a trap occurs is either `mips_utlb_handler` found on line 68 in exception-mips1.S or `mips_general_handler` found on line 86 in exception-mips1.S
+Control gets transferred to `common_exception` on line 104 in exception-mips1.S
+
+
+// Question 2
+syscall-mips.S line 84
+
+
+// Question 3
+Standard C functions that are commonly used.
+In common/libc because these standard library functions are used both by the kernel and user-level programs.
+In userland/lib/libc because protection & restricting privileges
+
+
+// Question 4
+Configure configures default location of the root of the installed system and target hardware platform and machine type.
+Running the configure script not from the top of the OS/161 tree might invalidate that configuration and make you need/want to rerun it or if you want to change location of source tree
+
+
+// Question 5
+Functions can be machine dependent if it relies on specific register structures or instruction sets that that machine implements.
+We would want to maintain this separation so that functions can be ran on different machines to avoid having to rewrite spcific code
+
+
+// Question 6
+148 bytes (4 bytes * 37 uint32), as defined in trapframe.h in lines 40 ~ 78 why is it large?
+
+
+// Question 7
+If you are running in a new machine or if the directory of your source tree changes or if you want to change where the system should be installed
+
+
+// Question 8
+bmake depend updates the header file depend information
+compile the DUMBVM kernel
+
+
+// Question 9
+bmake compiles the DUMBVM kernel in its source directory; bmake install installs that program in the right place in ~/root/os161
+
+
+// Question 10
+Append a new print hello world command to cmdtable on line 530 in menu.c for example `{ "print", printHelloWorld }` and write a function definition for the funciton printHelloWorld in the same file to run `kprintf("Hello World")`
+
+
+// Question 11
+Relying solely on standard utilites present on the machine does not provide strong isolation if applications are distrustful and do not provide efficient time sharing
+
+
+// Question 12
+in crt0.S
+The return value of main is saved to s0 (which is callee-save) so we still have it in case exit() returns.
+
+
+// Question 13
