@@ -79,16 +79,16 @@ asst1-start
 // Question 1
 First line of OS/161 code that is executed when a trap occurs is either `mips_utlb_handler` found on line 68 in exception-mips1.S or `mips_general_handler` found on line 86 in exception-mips1.S
 Control gets transferred to `common_exception` on line 104 in exception-mips1.S
+Interrupts are hardware events (ie, I/O devices)
 
 
 // Question 2
-syscall-mips.S line 84
+The line `syscall` on line 84 in src/userland/lib/libc/arch/mips/syscalls-mips.S
 
 
 // Question 3
-Standard C functions that are commonly used.
-In common/libc because these standard library functions are used both by the kernel and user-level programs.
-In userland/lib/libc because protection & restricting privileges
+In common/libc contains standard library functions that are used both by the kernel and user-level programs
+In userland/lib/libc there are standard library functions that user programs use that have lower privilege levels that the kernel will not need to use
 
 
 // Question 4
@@ -103,20 +103,19 @@ We would want to maintain this separation so that functions can be ran on differ
 
 // Question 6
 148 bytes (4 bytes * 37 uint32), as defined in trapframe.h in lines 40 ~ 78 why is it large?
-needs to store all of userland registers
+The trapframe is large because it needs to store all of userland registers during exceptino handling.
 
 
 // Question 7
-If you are running in a new machine or if the directory of your source tree changes or if you want to change where the system should be installed
+You should re-run the kern/conf/config script if you change the kernel config, add new source files to the build, or add new build options.
 
 
 // Question 8
-bmake depend updates the header file depend information
-compile the DUMBVM kernel
+You should run bmake depend in kern/compile/DUMBVM if/when you change header file inclusions, or after re-running config because bmake depend updates the header file depend information
 
 
 // Question 9
-bmake compiles the DUMBVM kernel in its source directory; bmake install installs that program in the right place in ~/root/os161
+Rerun bmake to recompile as needed. bmake compiles the DUMBVM kernel in its source directory; bmake install installs that program in the right place in ~/root/os161
 
 
 // Question 10
@@ -125,6 +124,7 @@ Append a new print hello world command to cmdtable on line 530 in menu.c for exa
 
 // Question 11
 Relying solely on standard utilites present on the machine does not provide strong isolation if applications are distrustful and do not provide efficient time sharing
+//TODO
 
 
 // Question 12
@@ -133,7 +133,26 @@ The return value of main is saved to s0 (which is callee-save) so we still have 
 
 
 // Question 13
-syscall.h (src\build\install\include\kern\ or src\kern\include\kern\)
+First define a new code for the new system call in src\build\install\include\kern\syscall.h
+For example `#define SYS_new         44`
+We need to define a new function for our new system call; we can do this in kern/main/main.c
+For example
+```
+int
+sys_new(int code)
+{
+	// code for new system call
+	return 0;
+}
+```
+In the syscall function in kern/arch/mips/syscall.c, in the switch statement on line 102, add a case for the new system call code and call
+For example
+```
+case SYS_reboot:
+err = sys_newtf->tf_a0);
+break;
+```
+
 
 
 // Step 7 -----------------------------------------------------------------------
@@ -151,8 +170,8 @@ addiu sp, sp, -24 on line 54 in start.S
 // Question 16
 (gdb) info breakpoints
 Num     Type           Disp Enb Address    What
-2       breakpoint     keep y   0x80014a0c in menu at ../../main/menu.c:697
-3       breakpoint     keep y   0x800139ec in kmain at ../../main/main.c:213
+2       breakpoint     keep y   0x80014a0c in menu at ../../main/menu.c:415
+3       breakpoint     keep y   0x800139ec in kmain at ../../main/main.c:211
 
 
 // Question 17
@@ -177,7 +196,7 @@ jal kmain on line 215 in start.S
 116             /* Probe and initialize devices. Interrupts should come on. */
 
 
-// Question 20 
+// Question 20
 (gdb) p *bootcpu
 Cannot access memory at address 0x80000
 
