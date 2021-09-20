@@ -139,4 +139,75 @@ syscall.h (src\build\install\include\kern\ or src\kern\include\kern\)
 // Step 7 -----------------------------------------------------------------------
 
 // Question 14
+Start.S
+__start() on line 39 in start.S
+kmain() on line 209 in main.c which calls boot()
 
+
+// Question 15
+addiu sp, sp, -24 on line 54 in start.S
+
+
+// Question 16
+(gdb) info breakpoints
+Num     Type           Disp Enb Address    What
+2       breakpoint     keep y   0x80014a0c in menu at ../../main/menu.c:697
+3       breakpoint     keep y   0x800139ec in kmain at ../../main/main.c:213
+
+
+// Question 17
+We save the return address register, set up the boot stack for the first processor, set up a bunch of registers TODO commens in start.S
+
+
+// Question 18
+jal kmain on line 215 in start.S
+
+
+// Question 19
+(gdb) list
+107
+108             /* Early initialization. */
+109             ram_bootstrap();
+110             proc_bootstrap();
+111             thread_bootstrap();
+112             hardclock_bootstrap();
+113             vfs_bootstrap();
+114             kheap_nextgeneration();
+115
+116             /* Probe and initialize devices. Interrupts should come on. */
+
+
+// Question 20 
+(gdb) p *bootcpu
+Cannot access memory at address 0x80000
+
+
+// Question 21
+(gdb) p *bootcpu
+$1 = {c_self = 0x8003af00, c_number = 0, c_hardware_number = 0, c_curthread = 0x8003bf80,
+  c_zombies = {tl_head = {tln_prev = 0x0, tln_next = 0x8003af1c, tln_self = 0x0}, tl_tail = {
+      tln_prev = 0x8003af10, tln_next = 0x0, tln_self = 0x0}, tl_count = 0}, c_hardclocks = 0,
+  c_spinlocks = 0, c_isidle = false, c_runqueue = {tl_head = {tln_prev = 0x0,
+      tln_next = 0x8003af44, tln_self = 0x0}, tl_tail = {tln_prev = 0x8003af38, tln_next = 0x0,
+      tln_self = 0x0}, tl_count = 0}, c_runqueue_lock = {splk_lock = 0, splk_holder = 0x0},
+  c_ipi_pending = 0, c_shootdown = {{ts_placeholder = 0} <repeats 16 times>}, c_numshootdown = 0,
+  c_ipi_lock = {splk_lock = 0, splk_holder = 0x0}}
+
+
+// Question 22
+(gdb) cpuarray allcpus
+0 cpus
+
+
+// Question 23
+(gdb) cpuarray allcpus
+1 cpus
+cpu 0:
+$1 = {c_self = 0x8003af00, c_number = 0, c_hardware_number = 0, c_curthread = 0x8003bf80,
+  c_zombies = {tl_head = {tln_prev = 0x0, tln_next = 0x8003af1c, tln_self = 0x0}, tl_tail = {
+      tln_prev = 0x8003af10, tln_next = 0x0, tln_self = 0x0}, tl_count = 0}, c_hardclocks = 1,
+  c_spinlocks = 0, c_isidle = false, c_runqueue = {tl_head = {tln_prev = 0x0,
+      tln_next = 0x8003af44, tln_self = 0x0}, tl_tail = {tln_prev = 0x8003af38, tln_next = 0x0,
+      tln_self = 0x0}, tl_count = 0}, c_runqueue_lock = {splk_lock = 0, splk_holder = 0x0},
+  c_ipi_pending = 0, c_shootdown = {{ts_placeholder = 0} <repeats 16 times>}, c_numshootdown = 0,
+  c_ipi_lock = {splk_lock = 0, splk_holder = 0x0}}
