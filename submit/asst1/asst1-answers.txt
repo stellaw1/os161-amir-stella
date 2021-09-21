@@ -178,7 +178,7 @@ Num     Type           Disp Enb Address    What
 
 
 // Question 17
-We save the return address register, set up the boot stack for the first processor, set up a bunch of registers in start.S
+In __start(), we save the return address register, set up the boot stack for the first processor, set up a stack frame on the real kernel stack, copy the exception handler code onto the first page of memory, initialize the TLB, set up the status register, set up flags and control bits, load the CPU number, load the GP register, and fetch the copy of the bootstring as the argument before calling kmain on line 215 in start.S
 
 
 // Question 18
