@@ -77,13 +77,14 @@ asst1-start
 // Step 5 -----------------------------------------------------------------------
 
 // Question 1
-First line of OS/161 code that is executed when a trap occurs is either `mips_utlb_handler` found on line 68 in exception-mips1.S or `mips_general_handler` found on line 86 in exception-mips1.S
-Control gets transferred to `common_exception` on line 104 in exception-mips1.S
-Interrupts are hardware events (ie, I/O devices)
+First line of OS/161 code that is executed when a trap occurs is either `mips_utlb_handler` found on line 68 in exception-mips1.S or `mips_general_handler` found on line 86 in exception-mips1.S depending on the exception. 
+Control gets transferred to `common_exception` on line 104 in exception-mips1.S which 
+saves important registers and calls mips_trap() which is defined in trap.c
+Interrupts are hardware events (ie, I/O devices) and are handled the same way as traps. The only difference is there is a code argument that is passed into mips_trap() that indicates whether it is an interrupt or not. It is checked on line 153 in trap.c and calls mainbus_interrupt() if interrupt is detected. 
 
 
 // Question 2
-The line `syscall` on line 84 in src/userland/lib/libc/arch/mips/syscalls-mips.S
+The line `syscall` on line 84 in src/userland/lib/libc/arch/mips/syscalls-mips.S invokes system calls from user programs and causes traps
 
 
 // Question 3
@@ -97,13 +98,15 @@ Running the configure script not from the top of the OS/161 tree might invalidat
 
 
 // Question 5
-Functions can be machine dependent if it relies on specific register structures or instruction sets that that machine implements.
-We would want to maintain this separation so that functions can be ran on different machines to avoid having to rewrite spcific code
+Constants, structures, types, exception handling etc. make a function machine dependent. 
+This is due to differences in how registers are structured or how instruction sets work in each machine.
+We would want to maintain this separation so that we don't have to re-write new code for every new machine. 
+By separating details that are machine specific, we can reuse function code on different machines. 
 
 
 // Question 6
-148 bytes (4 bytes * 37 uint32), as defined in trapframe.h in lines 40 ~ 78 why is it large?
-The trapframe is large because it needs to store all of userland registers during exceptino handling.
+148 bytes (37 uint32 that are 4 bytes each), as defined in trapframe.h in lines 40 ~ 78
+The trapframe is large because it needs to store all of userland registers during exception handling.
 
 
 // Question 7
@@ -115,7 +118,9 @@ You should run bmake depend in kern/compile/DUMBVM if/when you change header fil
 
 
 // Question 9
-Rerun bmake to recompile as needed. bmake compiles the DUMBVM kernel in its source directory; bmake install installs that program in the right place in ~/root/os161
+Rerun bmake to compile or recompile the DUMBVM kernel in its source directory.
+bmake install installs that program in the right place by copying the kernel to ~/root/os161 so it can be booted in System/161
+bmake and bmake install need to be rerun everytime changes are made to the kernel code. 
 
 
 // Question 10
@@ -124,7 +129,6 @@ Append a new print hello world command to cmdtable on line 530 in menu.c for exa
 
 // Question 11
 Relying solely on standard utilites present on the machine does not provide strong isolation if applications are distrustful and do not provide efficient time sharing
-//TODO
 
 
 // Question 12
@@ -152,15 +156,14 @@ case SYS_reboot:
 err = sys_newtf->tf_a0);
 break;
 ```
+Lastly rerun bmake and bmake install to re-compile the kernel and apply new changes
 
 
 
 // Step 7 -----------------------------------------------------------------------
 
 // Question 14
-Start.S
 __start() on line 39 in start.S
-kmain() on line 209 in main.c which calls boot()
 
 
 // Question 15
@@ -175,7 +178,7 @@ Num     Type           Disp Enb Address    What
 
 
 // Question 17
-We save the return address register, set up the boot stack for the first processor, set up a bunch of registers TODO commens in start.S
+We save the return address register, set up the boot stack for the first processor, set up a bunch of registers in start.S
 
 
 // Question 18
