@@ -155,6 +155,15 @@ lock_create(const char *name)
         }
 
         // add stuff here as needed
+        lock->lk_wchan = wchan_create(lock->lk_name);
+        if (lock->lk_wchan == NULL) {
+                kfree(lock->lk_name);
+                kfree(lock);
+                return NULL;
+        }
+
+        spinlock_init(&lock->lk_lock);
+        lock->lk_state = false;
 
         return lock;
 }
@@ -165,7 +174,8 @@ lock_destroy(struct lock *lock)
         KASSERT(lock != NULL);
 
         // add stuff here as needed
-
+        spinlock_cleanup(&lock->lk_lock);
+        wchan_destroy(lock->lk_wchan);
         kfree(lock->lk_name);
         kfree(lock);
 }
@@ -175,7 +185,25 @@ lock_acquire(struct lock *lock)
 {
         // Write this
 
-        (void)lock;  // suppress warning until code gets written
+        // (void)lock;  // suppress warning until code gets written
+
+        KASSERT(lock != NULL);
+
+        /*
+         * May not block in an interrupt handler.
+         *
+         * For robustness, always check, even if we can actually
+         * complete the P without blocking.
+         */
+        KASSERT(curthread->t_in_interrupt == false);
+
+        spinlock_acquire(&lock->lk_lock);
+        while (lock->lk_state == true) {
+                wchan_sleep(lock->lk_wchan, &lock->lk_lock);
+        }
+        KASSERT(lock->lk_state == false);
+        lock->lk_state = true;
+        spinlock_release(&lock->lk_lock);
 }
 
 void
@@ -183,7 +211,15 @@ lock_release(struct lock *lock)
 {
         // Write this
 
-        (void)lock;  // suppress warning until code gets written
+        // (void)lock;  // suppress warning until code gets written
+        KASSERT(lock != NULL);
+
+	spinlock_acquire(&lock->lk_lock);
+
+        lock->lk_state = false;
+	wchan_wakeone(lock->lk_wchan, &lock->lk_lock);
+
+	spinlock_release(&lock->lk_lock);
 }
 
 bool
@@ -191,9 +227,10 @@ lock_do_i_hold(struct lock *lock)
 {
         // Write this
 
-        (void)lock;  // suppress warning until code gets written
+        // (void)lock;  // suppress warning until code gets written
+        KASSERT(lock != NULL);
 
-        return true; // dummy until code gets written
+        return lock->lk_state;
 }
 
 ////////////////////////////////////////////////////////////

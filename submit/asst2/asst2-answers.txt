@@ -1,0 +1,61 @@
+// Step 2 Code Reading exercises ------------------------------------------------
+
+// Question 1
+When a thread exits/ calls thread_exit():
+
+When a thread sleeps/ calls thread thread_switch(S_SLEEP, wc, lk):
+
+
+// Question 2
+thread_switch() on line 560 in kern/thread/thread.c handles context switch Code
+
+
+// Question 3
+The possible thread states are:
+    - S_RUN = thread is running
+	- S_READY = thread is ready to run
+	- S_SLEEP = tread is sleeping
+	- S_ZOMBIE = thread is exited but not yet deleted
+
+
+// Question 4
+TODO What does it mean to turn interrupts off? How is this accomplished? Why is it important to turn off interrupts in the thread subsystem code?
+
+
+// Question 5
+thread_make_runnable
+wchan
+What happens when a thread wakes up another thread? How does a sleeping thread get to run again?
+
+
+// Question 6
+threadlist_addtail
+schedule() in thread.c if implemented
+md_idle() chooses the next thread to run
+threadlist_remhead() line 642 in kern/thread/thread.code
+thread_switch()
+threadlist_remhead kern/thread/threadlist.c
+
+
+// Quesiton 7
+threadlist_remhead kern/thread/threadlist.c
+The current cpu has a c_runqueue threadlist that gets passed to threadlist_remhead(), which returns the first thread after it in the threadlist and removes it from the list.
+
+
+// Question 8
+hardclock() in kern/thread/thread.c
+thread_consider_migration() in kern/thread/thread.c
+splx(spl); on line 578 in thread.c in kern/thread/thread.c is called on a timer interrupt
+
+
+// Question 9
+wchan_sleep() yields the cpu to another process, puts it in a queue, and goes to sleep
+wchan_wakeone() wakes up one thread sleeping on a wait channel
+A semaphore uses wchan_sleep() on threads that are waiting for semaphore->count to be positive (aka waiting for a thread to release the semaphore) to ensure that the thread does not busy wait while waiting and yields the cpu to other threads instead.
+It also uses wchan_wakeone() to wake a thread that was called wchan_sleep() on to let it know it can be ran after counter is incremented.
+
+
+// Question 10
+A wchan is protected by an associated, passed-in spinlock.
+wchan_create
+allwchans_lock
