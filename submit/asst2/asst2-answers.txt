@@ -19,27 +19,25 @@ The possible thread states are:
 
 
 // Question 4
-Turning interrupts off means other processes cannot intervene with the current one and the current process can run its operations atomically. This is accomplished by raising the Set Priority Level using splhigh(). It is important to turn off interrupts in the thread subsystem code so thread switches can happen atomically and threads can exit properly. 
+Turning interrupts off means other processes cannot intervene with the current one and the current process can run its operations atomically. This is accomplished by raising the Set Priority Level using splhigh(). It is important to turn off interrupts in the thread subsystem code so thread switches can happen atomically and threads can exit properly.
 
 
 // Question 5
-thread_make_runnable
-wchan
-What happens when a thread wakes up another thread? How does a sleeping thread get to run again?
 When a thread wakes up another thread, threadlist_remhead() is called to grab the sleeping thread from wait channel.
-thread_make_runnable() is called on the sleeping thread to make its state S_READY and adds it to the run queue. 
+thread_make_runnable() is called on the sleeping thread to make its state S_READY and adds it to the run queue.
 
 
 // Question 6
-schedule() in thread.c would choose the next thread to run if implemented, but the next thread will be chosen in a round robin fashion if not. 
- 
+thread_switch() on line 560 in kern/thread/thread.c chooses the next thread to run.
+The order of next threads are determined would be determined by schedule() in thread.c if it was implemented, otherwise the order of next threads are chosen in a round robin fashion.
+
 
 // Quesiton 7
-In thread_switch() in kern/thread/thread.c, threadlist_remhead() is called on line 642 to grab the next thread. 
-The current cpu has a c_runqueue threadlist that gets passed to threadlist_remhead(), which grabs the first thread (tln) in the threadlist as the next thread to run.
+In thread_switch(), threadlist_remhead() is called on line 642 to grab the next thread.
+The current cpu has a c_runqueue threadlist that gets passed to threadlist_remhead(), which grabs the first thread (tln) in the cpu's run queue threadlist as the next thread to run.
 
 // Question 8
-The function hardclock() in kern/thread/thread.c calls thread_consider_migration() and schedule(), both of which affect scheduling of threads. thread_consider_migration() moves threads to other idle CPUs if the current one is busy, and schedule() would reshuffle the current CPU's runqueue if implemented. 
+The function hardclock() in kern/thread/thread.c calls thread_consider_migration() and schedule(), both of which affect scheduling of threads. thread_consider_migration() moves threads to other idle CPUs if the current one is busy, and schedule() would reshuffle the current CPU's runqueue if it was implemented.
 thread_yield() is the hardware independent function that is called on a timer interrupt on line 106 in kern/thread/clock.c
 
 
@@ -51,4 +49,4 @@ It also uses wchan_wakeone() to wake a thread that was called wchan_sleep() on t
 
 
 // Question 10
-A wchan is protected by an associated, passed-in spinlock which ensures wakeup signals and sleep processes are atomic. 
+A wchan is protected by an associated, passed-in spinlock which ensures wakeup signals and sleep processes are atomic.

@@ -620,8 +620,8 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	cur->t_state = newstate;
 
 	/*
-	 * Get the next thread. While there isn't one, call md_idle().
-	 * curcpu->c_isidle must be true when md_idle is
+	 * Get the next thread. While there isn't one, call cpu_idle().
+	 * curcpu->c_isidle must be true when cpu_idle is
 	 * called. Unlock the runqueue while idling too, to make sure
 	 * things can be added to it.
 	 *
