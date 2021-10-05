@@ -51,6 +51,8 @@
 #include <mainbus.h>
 #include <vnode.h>
 
+#include "opt-synchprobs.h"
+
 
 /* Magic number used as a guard value on kernel thread stacks. */
 #define THREAD_STACK_MAGIC 0xbaadf00d
@@ -620,8 +622,8 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	cur->t_state = newstate;
 
 	/*
-	 * Get the next thread. While there isn't one, call cpu_idle().
-	 * curcpu->c_isidle must be true when cpu_idle is
+	 * Get the next thread. While there isn't one, call md_idle().
+	 * curcpu->c_isidle must be true when md_idle is
 	 * called. Unlock the runqueue while idling too, to make sure
 	 * things can be added to it.
 	 *
@@ -756,6 +758,17 @@ thread_startup(void (*entrypoint)(void *data1, unsigned long data2),
 
 	/* Enable interrupts. */
 	spl0();
+
+#if OPT_SYNCHPROBS
+	/* Yield a random number of times to get a good mix of threads. */
+	{
+		int i, n;
+		n = random()%161 + random()%161;
+		for (i=0; i<n; i++) {
+			thread_yield();
+		}
+	}
+#endif
 
 	/* Call the function. */
 	entrypoint(data1, data2);
