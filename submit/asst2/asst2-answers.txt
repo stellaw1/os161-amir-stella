@@ -1,7 +1,7 @@
 // Step 2 Code Reading exercises ------------------------------------------------
 
 // Question 1
-When a thread exits/ calls thread_exit(), the thread is removed from its process, overflow of thread stack is checked, and the thread is swtiched to be in a zombie state. Thread is not cleaned up yet and has to wait until thread_destroy is called from exorcis()
+When a thread exits/ calls thread_exit(), the thread is removed from its process, overflow of thread stack is checked, and the thread is swtiched to be in a zombie state. Thread is not cleaned up yet and has to wait until thread_destroy is called from exorcise()
 When a thread sleeps/ calls thread thread_switch(S_SLEEP, wc, lk), the thread is queued on the wait channel wc, protected by the spinlock lk. Specifically, interrupts are first diables on the running processor, overflow of thread stack is checked, the thread's run queue is locked, the thread is added to the tail of wc's tail, and its state is updated. The next thread is grabbed from wc and a context switch to that thread happens; if successful the next thread is ran. If no next thread exists, the cpu idles
 
 

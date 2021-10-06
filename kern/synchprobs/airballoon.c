@@ -13,14 +13,15 @@ static int ropes_left = NROPES;
 
 /* Data structures for rope mappings */
 
-static int hooks[NROPES];
-static int stakes[NROPES];
-static bool ropes[NROPES];
+static int hooks[NROPES]; 			// represents rope index that hooks are attached to and -1 represents unhooked hooks
+static int stakes[NROPES];			// represents rope index that stakes are attached to and -1 represents unstaked stakes
+static bool ropes[NROPES];			// represents status of rope - false == unsevered; true == severed
 
 /* Synchronization primitives */
 
-static struct lock *mutexLock; // protects hooks, stakes, and ropes_left
-// static struct cv *balloonFreeCv;
+static struct lock *ropeLock; 		// protects hooks, stakes, and ropes_left
+static struct cv *balloonCv;		// tracks whether balloon is free to escape ie all ropes are severed
+static struct semaphore *doneSem;	// tracks completion status of all threads
 
 /*
  * Describe your design and any invariants or locking protocols
@@ -30,22 +31,61 @@ static struct lock *mutexLock; // protects hooks, stakes, and ropes_left
 
 static
 void
-initRopePositions()
+init()
 {
+	// init rope positions
 	for (int i = 0 ; i < NROPES ; i++) {
         hooks[i] = i;
         stakes[i] = i;
 		ropes[i] = false;
 	}
+
+	// init number of ropes left to be severed
+	ropes_left = NROPES;
+
+	// init mutex lock
+	ropeLock = lock_create("ropePositions");
+	if (ropeLock == NULL) {
+		panic("Could not create mutex_lock\n");
+	}
+
+	// init cv
+	balloonCv = cv_create("balloon free");
+	if (balloonCv == NULL) {
+		panic("Could not create balloonCv\n");
+	}
+
+	//init semaphore
+	doneSem = sem_create("main done", 0);
+	if (doneSem == NULL) {
+		panic("Could not create doneSem\n");
+	}
 }
 
 
-// static
-// void
-// cleanup()
-// {
-// 	lock_destroy(mutexLock);
-// }
+static
+void
+cleanup()
+{
+	lock_destroy(ropeLock);
+	cv_destroy(balloonCv);
+	sem_destroy(doneSem);
+	
+	//TODO 
+	// kfree(hooks);
+	// kfree(stakes);
+	// kfree(ropes);
+	// kfree(ropes_left);
+}
+
+static
+void
+checkBalloonStatus()
+{
+	if (ropes_left <= 0) {
+		cv_broadcast(balloonCv, ropeLock);
+	}
+}
 
 
 // static
@@ -74,25 +114,28 @@ dandelion(void *p, unsigned long arg) // sky hooks
 	while (ropes_left > 0) {
 		int hookIndex = random() % NROPES;
 
-		lock_acquire(mutexLock);
-		ropeIndex = hooks[hookIndex];
-		if (ropeIndex != -1) { // hook has not been unhooked
-			if (ropes[ropeIndex] == false) { //rope is not yet severed 
-				ropes[ropeIndex] = true;
-				hooks[hookIndex] = -1;
-				kprintf("Dandelion severed rope %d\n", hookIndex);
+		lock_acquire(ropeLock);
+		if (ropes_left > 0) {
+			ropeIndex = hooks[hookIndex];
+			if (ropeIndex != -1) { // hook has not been unhooked
+				if (ropes[ropeIndex] == false) { //rope is not yet severed 
+					ropes[ropeIndex] = true;
+					hooks[hookIndex] = -1;
+					kprintf("Dandelion severed rope %d\n", hookIndex);
 
-				ropes_left--;
-			} else { //update hook to be "unhooked" as the attached rope has been unstaked
-				hooks[hookIndex] = -1;
+					ropes_left--;
+					checkBalloonStatus();
+				} else { //update hook to be "unhooked" as the attached rope has been unstaked
+					hooks[hookIndex] = -1;
+				}
+				
 			}
-			
 		}
-		lock_release(mutexLock);
+		lock_release(ropeLock);
 	}
 
 	kprintf("Dandelion thread done\n");
-	thread_exit();
+	V(doneSem);
 }
 
 static
@@ -108,70 +151,106 @@ marigold(void *p, unsigned long arg) // ground stakes
 	while (ropes_left > 0) {
 		int stakeIndex = random() % NROPES;
 
-		lock_acquire(mutexLock);
-		ropeIndex = stakes[stakeIndex];
-		if (ropeIndex != -1) { //stake has not been unstaked
-			if (ropes[ropeIndex] == false) { //rope is not yet severed
-				ropes[ropeIndex] = true;
-				stakes[stakeIndex] = -1;
-				kprintf("Marigold severed rope %d from stake %d\n", ropeIndex, stakeIndex);
+		lock_acquire(ropeLock);
+		if (ropes_left > 0) {
+			//TODO check ropes_left non zero
+			ropeIndex = stakes[stakeIndex];
+			if (ropeIndex != -1) { //stake has not been unstaked
+				if (ropes[ropeIndex] == false) { //rope is not yet severed
+					ropes[ropeIndex] = true;
+					stakes[stakeIndex] = -1;
+					kprintf("Marigold severed rope %d from stake %d \n", ropeIndex, stakeIndex);
 
-				ropes_left--;
-			} else { //update stake to be "unstaked" as the attached rope has been unhooked
-				stakes[stakeIndex] = -1;
+					ropes_left--;
+					checkBalloonStatus();
+				} else { //update stake to be "unstaked" as the attached rope has been unhooked
+					stakes[stakeIndex] = -1;
+				}
 			}
 		}
-		lock_release(mutexLock);
+		lock_release(ropeLock);
 	}
 
 	kprintf("Marigold thread done\n");
-	thread_exit();
+	V(doneSem);
 }
 
-// static
-// void
-// flowerkiller(void *p, unsigned long arg)
-// {
-// 	(void)p;
-// 	(void)arg;
+static
+void
+flowerkiller(void *p, unsigned long arg)
+{
+	(void)p;
+	(void)arg;
+	int stakeK, stakeP, ropeK, ropeP;
 
-// 	kprintf("Lord FlowerKiller thread starting\n");
+	kprintf("Lord FlowerKiller thread starting\n");
 
-// 	thread_exit();
-// }
+	while (ropes_left > 1) {
 
-// static
-// void
-// balloon(void *p, unsigned long arg)
-// {
-// 	(void)p;
-// 	(void)arg;
+		lock_acquire(ropeLock);
+		if (ropes_left > 1) {
+			stakeK = random() % NROPES;
+			ropeK = stakes[stakeK];
+			
+			while (ropeK == -1 || ropes[ropeK] == true) {
+				stakeK = random() % NROPES;
+				ropeK = stakes[stakeK];
+			}
 
-// 	kprintf("Balloon thread starting\n");
+			stakeP = random() % NROPES;
+			ropeP = stakes[stakeP];
+			while (ropeP == -1 || ropes[ropeP] == true || stakeP == stakeK) {
+				stakeP = random() % NROPES;
+				ropeP = stakes[stakeP];
+			}
 
-// 	thread_exit();
-// }
+			stakes[stakeK] = ropeP;
+			stakes[stakeP] = ropeK;
+
+			kprintf("Lord FlowerKiller switched rope %d from stake %d to stake %d \n", ropeK, stakeK, stakeP);
+		}
+		lock_release(ropeLock);
+	}
+	
+	kprintf("Lord FlowerKiller thread done\n");
+	V(doneSem);
+}
+
+static
+void
+balloon(void *p, unsigned long arg)
+{
+	(void)p;
+	(void)arg;
+
+	kprintf("Balloon thread starting\n");
+
+	lock_acquire(ropeLock);
+	while (ropes_left > 0) {
+		cv_wait(balloonCv, ropeLock);
+	}
+	kprintf("Balloon freed and Prince Dandelion escapes!\n");
+
+	lock_release(ropeLock);
+
+	kprintf("Balloon thread done\n");
+	V(doneSem);
+}
 
 
-// Change this function as necessary
 int
 airballoon(int nargs, char **args)
 {
 
-	int err = 0;
+	int err = 0, i;
+	int nthreads = N_LORD_FLOWERKILLER + 3;
 
 	(void)nargs;
 	(void)args;
 	(void)ropes_left;
 
 
-	initRopePositions();
-	ropes_left = NROPES;
-	mutexLock = lock_create("ropePositions");
-	if (mutexLock == NULL) {
-		kprintf("mutexLock Null");
-		panic("Could not create mutex_lock\n");
-	}
+	init();
 
 
 	err = thread_fork("Marigold Thread",
@@ -184,17 +263,24 @@ airballoon(int nargs, char **args)
 	if(err)
 		goto panic;
 
-	// for (i = 0; i < N_LORD_FLOWERKILLER; i++) {
-	// 	err = thread_fork("Lord FlowerKiller Thread",
-	// 			  NULL, flowerkiller, NULL, 0);
-	// 	if(err)
-	// 		goto panic;
-	// }
+	for (i = 0; i < N_LORD_FLOWERKILLER; i++) {
+		err = thread_fork("Lord FlowerKiller Thread",
+				  NULL, flowerkiller, NULL, 0);
+		if(err)
+			goto panic;
+	}
 
-	// err = thread_fork("Air Balloon",
-	// 		  NULL, balloon, NULL, 0);
+	err = thread_fork("Air Balloon",
+			  NULL, balloon, NULL, 0);
 	if(err)
 		goto panic;
+
+
+	//thread_join()
+	for (i = 0; i < nthreads; i++) {
+		P(doneSem);
+	}
+	kprintf("Main thread done\n");
 
 	goto done;
 panic:
@@ -202,6 +288,6 @@ panic:
 	      strerror(err));
 
 done:
-	// cleanup();
+	cleanup();
 	return 0;
 }

@@ -44,10 +44,10 @@
  * internally.
  */
 struct semaphore {
-        char *sem_name;
+	char *sem_name;
 	struct wchan *sem_wchan;
 	struct spinlock sem_lock;
-        volatile unsigned sem_count;
+	volatile unsigned sem_count;
 };
 
 struct semaphore *sem_create(const char *name, unsigned initial_count);
