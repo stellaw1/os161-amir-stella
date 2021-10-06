@@ -7,8 +7,8 @@
 #include <test.h>
 #include <synch.h>
 
-#define N_LORD_FLOWERKILLER 8
-#define NROPES 16
+#define N_LORD_FLOWERKILLER 20
+#define NROPES 30
 static int ropes_left = NROPES;
 
 /* Data structures for rope mappings */
@@ -62,7 +62,6 @@ init()
 	}
 }
 
-
 static
 void
 cleanup()
@@ -86,19 +85,6 @@ checkBalloonStatus()
 		cv_broadcast(balloonCv, ropeLock);
 	}
 }
-
-
-// static
-// int
-// getIndexOf(int array[NROPES], int ropeIndex)
-// {
-// 	for (int i = 0; i < NROPES; i++) {
-// 		if (array[i] == ropeIndex) {
-// 			return i;
-// 		}
-// 	}
-// 	return -1;
-// }
 
 
 static
