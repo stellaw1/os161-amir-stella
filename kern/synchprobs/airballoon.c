@@ -5,6 +5,7 @@
 #include <lib.h>
 #include <thread.h>
 #include <test.h>
+#include <synch.h>
 
 #define N_LORD_FLOWERKILLER 8
 #define NROPES 16
@@ -12,11 +13,13 @@ static int ropes_left = NROPES;
 
 /* Data structures for rope mappings */
 
-/* Implement this! */
+static int hooks[NROPES];
+static int stakes[NROPES];
 
 /* Synchronization primitives */
 
-/* Implement this! */
+static struct lock *mutexLock; // protects hooks, stakes, and ropes_left
+// static struct cv *balloonFreeCv;
 
 /*
  * Describe your design and any invariants or locking protocols
@@ -26,26 +29,91 @@ static int ropes_left = NROPES;
 
 static
 void
-dandelion(void *p, unsigned long arg)
+initRopePositions()
+{
+	for (int i = 0 ; i < NROPES ; i++) {
+        hooks[i] = i;
+        stakes[i] = i;
+	}
+}
+
+
+static
+void
+cleanup()
+{
+	lock_destroy(mutexLock);
+}
+
+
+// static
+// int
+// getIndexOf(int array[NROPES], int ropeIndex)
+// {
+// 	for (int i = 0; i < NROPES; i++) {
+// 		if (array[i] == ropeIndex) {
+// 			return i;
+// 		}
+// 	}
+// 	return -1;
+// }
+
+
+static
+void
+dandelion(void *p, unsigned long arg) // sky hooks
 {
 	(void)p;
 	(void)arg;
+	int ropeIndex;
 
 	kprintf("Dandelion thread starting\n");
 
-	/* Implement this function */
+	while (ropes_left > 0) {
+		int hookIndex = random() % NROPES;
+
+		lock_acquire(mutexLock);
+		ropeIndex = hooks[hookIndex];
+		if (ropeIndex != -1) {
+			hooks[hookIndex] = -1;
+			kprintf("Dandelion severed rope %d\n", hookIndex);
+
+			ropes_left--;
+		}
+		lock_release(mutexLock);
+	}
+
+	kprintf("Dandelion thread done\n");
+	thread_exit();
 }
 
 static
 void
-marigold(void *p, unsigned long arg)
+marigold(void *p, unsigned long arg) // ground stakes 
 {
 	(void)p;
 	(void)arg;
+	int ropeIndex;
 
 	kprintf("Marigold thread starting\n");
 
-	/* Implement this function */
+	while (ropes_left > 0) {
+		int stakeIndex = random() % NROPES;
+		kprintf("%d", ropeIndex);
+
+		lock_acquire(mutexLock);
+		ropeIndex = stakes[stakeIndex];
+		if (ropeIndex != -1) {
+			stakes[stakeIndex] = -1;
+			kprintf("Marigold severed rope %d from stake %d\n", ropeIndex, stakeIndex);
+
+			ropes_left--;
+		}
+		lock_release(mutexLock);
+	}
+
+	kprintf("Marigold thread done\n");
+	thread_exit();
 }
 
 static
@@ -57,7 +125,7 @@ flowerkiller(void *p, unsigned long arg)
 
 	kprintf("Lord FlowerKiller thread starting\n");
 
-	/* Implement this function */
+	thread_exit();
 }
 
 static
@@ -69,7 +137,7 @@ balloon(void *p, unsigned long arg)
 
 	kprintf("Balloon thread starting\n");
 
-	/* Implement this function */
+	thread_exit();
 }
 
 
@@ -83,6 +151,10 @@ airballoon(int nargs, char **args)
 	(void)nargs;
 	(void)args;
 	(void)ropes_left;
+
+
+	initRopePositions();
+	mutexLock = lock_create("ropePositions");
 
 	err = thread_fork("Marigold Thread",
 			  NULL, marigold, NULL, 0);
@@ -112,5 +184,6 @@ panic:
 	      strerror(err));
 
 done:
+	cleanup();
 	return 0;
 }
