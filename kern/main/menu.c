@@ -560,10 +560,13 @@ static struct {
 	{ "halt",	cmd_quit },
 
 #if OPT_SYNCHPROBS
+	/* in-kernel synchronization problem(s) */
+	{ "sp1",	airballoon },
 #endif
 
 	/* stats */
 	{ "kh",         cmd_kheapstats },
+	{ "khgen",      cmd_kheapgeneration },
 	{ "khdump",     cmd_kheapdump },
 
 	/* base system tests */
