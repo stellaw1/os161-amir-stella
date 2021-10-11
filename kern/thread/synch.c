@@ -186,7 +186,9 @@ lock_acquire(struct lock *lock)
 	KASSERT(curthread->t_in_interrupt == false);
 
 	spinlock_acquire(&lock->lk_lock);
-	KASSERT(lock->lk_holder != curthread);
+	if (lock->lk_holder == curthread) {
+		return;
+	}
 	while (lock->lk_holder != NULL) {
 		/* As in the semaphore. */
 		wchan_sleep(lock->lk_wchan, &lock->lk_lock);
