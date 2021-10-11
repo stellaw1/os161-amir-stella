@@ -7,8 +7,8 @@
 #include <test.h>
 #include <synch.h>
 
-#define N_LORD_FLOWERKILLER 50
-#define NROPES 100
+#define N_LORD_FLOWERKILLER 8
+#define NROPES 16
 static int ropes_left = NROPES;
 
 
@@ -182,7 +182,7 @@ marigold(void *p, unsigned long arg) // ground stakes
 		lock_acquire(ropes[ropeIndex].ropeLock);
 		if (ropes_left > 0 && ropes[ropeIndex].state == false) {
 			ropes[ropeIndex].state = true;
-			kprintf("Marigold severed rope %d from stake %d \n", ropeIndex, stakeIndex);
+			kprintf("Marigold severed rope %d from stake %d\n", ropeIndex, stakeIndex);
 
 			decrementRopesLeft();
 			thread_yield();
@@ -260,7 +260,8 @@ flowerkiller(void *p, unsigned long arg)
 		lock_release(stakes[stakeK].stakeLock);
 		lock_release(stakes[stakeP].stakeLock);
 
-		kprintf("Lord FlowerKiller switched rope %d from stake %d to stake %d \n", ropeK, stakeK, stakeP);
+		kprintf("Lord FlowerKiller switched rope %d from stake %d to stake %d\nLord FlowerKiller switched rope %d from stake %d to stake %d\n", 
+		ropeK, stakeK, stakeP, ropeP, stakeP, stakeK);
 		thread_yield();
 	}
 
