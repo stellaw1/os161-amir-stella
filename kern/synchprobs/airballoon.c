@@ -7,8 +7,8 @@
 #include <test.h>
 #include <synch.h>
 
-#define N_LORD_FLOWERKILLER 10
-#define NROPES 20
+#define N_LORD_FLOWERKILLER 50
+#define NROPES 100
 static int ropes_left = NROPES;
 
 /* Data structures for rope mappings */
@@ -84,8 +84,6 @@ init()
 	}
 }
 
-
-//TODO
 
 // static
 // void
@@ -175,61 +173,71 @@ marigold(void *p, unsigned long arg) // ground stakes
 	V(doneSem);
 }
 
-// static
-// void
-// flowerkiller(void *p, unsigned long arg)
-// {
-// 	(void)p;
-// 	(void)arg;
-// 	int stakeK, stakeP, ropeK, ropeP;
+static
+void
+flowerkiller(void *p, unsigned long arg)
+{
+	(void)p;
+	(void)arg;
+	int stakeK, stakeP, ropeK, ropeP;
 
-// 	kprintf("Lord FlowerKiller thread starting\n");
+	kprintf("Lord FlowerKiller thread starting\n");
 
-// 	while (ropes_left > 1) {
+	while (ropes_left > 1) {
 
-// 		lock_acquire(ropesLeftLock);
-// 		if (ropes_left > 1) {
-// 			lock_release(ropesLeftLock);
+		stakeK = random() % NROPES;
+		stakeP = random() % NROPES;
 
-// 			stakeK = random() % NROPES;
-// 			stakeP = random() % NROPES;
+		if (stakeK == stakeP) {
+			continue;
+		}
 
-// 			if (stakeK < stakeP) {
-// 				lock_acquire(ropeLocks[stakes[stakeK]]);
-// 				lock_acquire(ropeLocks[stakes[stakeP]]);
-// 			} else if (stakeP < stakeK) {
-// 				lock_acquire(ropeLocks[stakes[stakeP]]);
-// 				lock_acquire(ropeLocks[stakes[stakeK]]);
-// 			} else {
-// 				continue;
-// 			}
+		if (stakeK < stakeP) {
+			lock_acquire(stakes[stakeK].stakeLock);
+			lock_acquire(stakes[stakeP].stakeLock);
 
-// 			if (ropes[stakes[stakeK]] || ropes[stakes[stakeP]]) {
-// 				lock_release(ropeLocks[stakes[stakeK]]);
-// 				lock_release(ropeLocks[stakes[stakeP]]);
+			ropeK = stakes[stakeK].ropeIndex;
+			ropeP = stakes[stakeP].ropeIndex;
 
-// 				continue;
-// 			}
+			lock_acquire(ropes[ropeK].ropeLock);
+			lock_acquire(ropes[ropeP].ropeLock);
+		} else {
+			lock_acquire(stakes[stakeP].stakeLock);
+			lock_acquire(stakes[stakeK].stakeLock);
 
-// 			ropeK = stakes[stakeK];
-// 			ropeP = stakes[stakeP];
+			ropeP = stakes[stakeP].ropeIndex;
+			ropeK = stakes[stakeK].ropeIndex;
 
-// 			stakes[stakeK] = ropeP;
-// 			stakes[stakeP] = ropeK;
+			lock_acquire(ropes[ropeP].ropeLock);
+			lock_acquire(ropes[ropeK].ropeLock);
+		}
 
-// 			lock_release(ropeLocks[stakes[stakeK]]);
-// 			lock_release(ropeLocks[stakes[stakeP]]);
+		if (ropes[ropeK].state || ropes[ropeP].state) {
+			lock_release(ropes[ropeP].ropeLock);
+			lock_release(ropes[ropeK].ropeLock);
 
-// 			kprintf("Lord FlowerKiller switched rope %d from stake %d to stake %d \n", ropeK, stakeK, stakeP);
-// 			thread_yield();
-// 		} else {
-// 			lock_release(ropesLeftLock);
-// 		}
-// 	}
+			lock_release(stakes[stakeK].stakeLock);
+			lock_release(stakes[stakeP].stakeLock);
 
-// 	kprintf("Lord FlowerKiller thread done\n");
-// 	V(doneSem);
-// }
+			continue;
+		}
+
+		stakes[stakeK].ropeIndex = ropeP;
+		stakes[stakeP].ropeIndex = ropeK;
+
+		lock_release(ropes[ropeP].ropeLock);
+		lock_release(ropes[ropeK].ropeLock);
+
+		lock_release(stakes[stakeK].stakeLock);
+		lock_release(stakes[stakeP].stakeLock);
+
+		kprintf("Lord FlowerKiller switched rope %d from stake %d to stake %d \n", ropeK, stakeK, stakeP);
+		thread_yield();
+	}
+
+	kprintf("Lord FlowerKiller thread done\n");
+	V(doneSem);
+}
 
 static
 void
@@ -256,7 +264,7 @@ airballoon(int nargs, char **args)
 {
 
 	int err = 0;
-	int nthreads = 3;
+	int nthreads = N_LORD_FLOWERKILLER + 3;
 
 	(void)nargs;
 	(void)args;
@@ -276,12 +284,12 @@ airballoon(int nargs, char **args)
 	if(err)
 		goto panic;
 
-	// for (int i = 0; i < N_LORD_FLOWERKILLER; i++) {
-	// 	err = thread_fork("Lord FlowerKiller Thread",
-	// 			  NULL, flowerkiller, NULL, 0);
-	// 	if(err)
-	// 		goto panic;
-	// }
+	for (int i = 0; i < N_LORD_FLOWERKILLER; i++) {
+		err = thread_fork("Lord FlowerKiller Thread",
+				  NULL, flowerkiller, NULL, 0);
+		if(err)
+			goto panic;
+	}
 
 	err = thread_fork("Air Balloon",
 			  NULL, balloon, NULL, 0);
