@@ -11,8 +11,8 @@
 #define NROPES 100
 static int ropes_left = NROPES;
 
-/* Data structures for rope mappings */
 
+/* Data structures for rope mappings */
 struct rope {
 	struct lock *ropeLock;			// protects status of rope
 	bool state; 					// false == attached; true == severed
@@ -31,25 +31,26 @@ static struct rope ropes[NROPES];
 static struct stake stakes[NROPES];
 static struct hook hooks[NROPES];
 
+
 /* Synchronization primitives */
-static struct lock *ropesLeftLock;
-static struct cv *ropesLeftCv;		// tracks whether balloon is free to escape ie all ropes are severed
+static struct lock *ropesLeftLock;	// protects the ropes_left variable
+static struct cv *balloonFreeCv;	// tracks whether balloon is free to escape ie, all ropes are severed
 static struct semaphore *doneSem;	// tracks completion status of all threads
 
-/*
- * Describe your design and any invariants or locking protocols
- * that must be maintained. Explain the exit conditions. How
- * do all threads know when they are done?
- */
 
-// Helper functions
+/* Helper functions */
+
+/*
+ * initializes ropes array to have state == false, and stakes/hooks to have 1-1 rope mapping
+ * also initializes synchronization primitives for ropes, stakes, ropes_left and balloon free
+ */
 static
 void
 init()
 {
 	// init ropes, stakes, and hooks
 	for (int i = 0 ; i < NROPES ; i++) {
-		ropes[i].state = false;
+		ropes[i].state = false; //attached
 		ropes[i].ropeLock = lock_create("ropeLock");
 		if (ropes[i].ropeLock == NULL) {
 			panic("Could not create ropeLock\n");
@@ -72,12 +73,12 @@ init()
 	if (ropesLeftLock == NULL) {
 		panic("Could not create ropesLeftLock\n");
 	}
-	ropesLeftCv = cv_create("balloon free");
-	if (ropesLeftCv == NULL) {
-		panic("Could not create ropesLeftCv\n");
+	balloonFreeCv = cv_create("balloon free");
+	if (balloonFreeCv == NULL) {
+		panic("Could not create balloonFreeCv\n");
 	}
 
-	//init semaphore
+	//init thread_join semaphore
 	doneSem = sem_create("main done", 0);
 	if (doneSem == NULL) {
 		panic("Could not create doneSem\n");
@@ -85,19 +86,28 @@ init()
 }
 
 
-// static
-// void
-// cleanup()
-// {
-// 	for (int i = 0; i < NROPES; i++) {
-// 		lock_destroy(ropeLocks[i]);
-// 		ropeLocks[i] = NULL;
-// 	}
-// 	lock_destroy(ropesLeftLock);
-// 	cv_destroy(ropesLeftCv);
-// 	sem_destroy(doneSem);
-// }
+/*
+ * Cleans up memory used for synchronization primitives
+ */
+static
+void
+cleanup()
+{
+	for (int i = 0; i < NROPES; i++) {
+		lock_destroy(ropes[i].ropeLock);
+		ropes[i].ropeLock = NULL;
+		lock_destroy(stakes[i].stakeLock);
+		stakes[i].stakeLock = NULL;
+	}
+	lock_destroy(ropesLeftLock);
+	cv_destroy(balloonFreeCv);
+	sem_destroy(doneSem);
+}
 
+
+/*
+ * Atomically decrements ropes_left by 1 and signals balloonFreeCv if ropes_left is 0
+ */
 static
 void
 decrementRopesLeft()
@@ -105,13 +115,19 @@ decrementRopesLeft()
 	lock_acquire(ropesLeftLock);
 	ropes_left--;
 	if (ropes_left <= 0) {
-		cv_broadcast(ropesLeftCv, ropesLeftLock);
+		cv_broadcast(balloonFreeCv, ropesLeftLock);
 	}
 	lock_release(ropesLeftLock);
 }
 
 
-// Thread functions
+/* Thread functions */
+
+/*
+ * Dandelion accesses hooks array with some random hookIndex in the range [0, NROPES)
+ * It grabs the ropeIndex at that hookIndex and grabs the according ropeLock at ropeIndex in ropes,
+ * and marks the rope as severed if its state is false, moves on otherwise.
+ */
 static
 void
 dandelion(void *p, unsigned long arg) // sky hooks
@@ -141,6 +157,12 @@ dandelion(void *p, unsigned long arg) // sky hooks
 	V(doneSem);
 }
 
+
+/*
+ * Marigold accesses stakes array with some random stakeIndex in the range [0, NROPES)
+ * It grabs the lock and the ropeIndex at that stakeIndex and grabs the according ropeLock at ropeIndex in ropes,
+ * and marks the rope as severed if its state is false, moves on otherwise.
+ */
 static
 void
 marigold(void *p, unsigned long arg) // ground stakes
@@ -173,6 +195,13 @@ marigold(void *p, unsigned long arg) // ground stakes
 	V(doneSem);
 }
 
+
+/*
+ * Flowerkiller accesses stakes array with two random stakeK and stakeP in the range [0, NROPES) that are different
+ * It grabs the two stakeLock's in ascending stakeIndex order then grabs both ropeIndex's and their ropeLock's
+ * If the two ropes are not already severed, Flowerkiller switches the ropeIndex's on stakeK and stakeP, if either of
+ * stakeK or stakeP has already been severed, we move on.
+ */
 static
 void
 flowerkiller(void *p, unsigned long arg)
@@ -188,33 +217,32 @@ flowerkiller(void *p, unsigned long arg)
 		stakeK = random() % NROPES;
 		stakeP = random() % NROPES;
 
+		// check if stakeK and stakeP are the same stake
 		if (stakeK == stakeP) {
 			continue;
 		}
 
+		// grab stakeLock's in ascending order
 		if (stakeK < stakeP) {
 			lock_acquire(stakes[stakeK].stakeLock);
 			lock_acquire(stakes[stakeP].stakeLock);
-
-			ropeK = stakes[stakeK].ropeIndex;
-			ropeP = stakes[stakeP].ropeIndex;
-
-			lock_acquire(ropes[ropeK].ropeLock);
-			lock_acquire(ropes[ropeP].ropeLock);
 		} else {
 			lock_acquire(stakes[stakeP].stakeLock);
 			lock_acquire(stakes[stakeK].stakeLock);
-
-			ropeP = stakes[stakeP].ropeIndex;
-			ropeK = stakes[stakeK].ropeIndex;
-
-			lock_acquire(ropes[ropeP].ropeLock);
-			lock_acquire(ropes[ropeK].ropeLock);
 		}
 
+		// get both ropeIndex's
+		ropeK = stakes[stakeK].ropeIndex;
+		ropeP = stakes[stakeP].ropeIndex;
+
+		// grab both ropeLock's
+		lock_acquire(ropes[ropeK].ropeLock);
+		lock_acquire(ropes[ropeP].ropeLock);
+
+		// check if either ropeK or ropeP has been severed already
 		if (ropes[ropeK].state || ropes[ropeP].state) {
-			lock_release(ropes[ropeP].ropeLock);
 			lock_release(ropes[ropeK].ropeLock);
+			lock_release(ropes[ropeP].ropeLock);
 
 			lock_release(stakes[stakeK].stakeLock);
 			lock_release(stakes[stakeP].stakeLock);
@@ -222,11 +250,12 @@ flowerkiller(void *p, unsigned long arg)
 			continue;
 		}
 
+		// swap ropeK and ropeP
 		stakes[stakeK].ropeIndex = ropeP;
 		stakes[stakeP].ropeIndex = ropeK;
 
-		lock_release(ropes[ropeP].ropeLock);
 		lock_release(ropes[ropeK].ropeLock);
+		lock_release(ropes[ropeP].ropeLock);
 
 		lock_release(stakes[stakeK].stakeLock);
 		lock_release(stakes[stakeP].stakeLock);
@@ -239,6 +268,10 @@ flowerkiller(void *p, unsigned long arg)
 	V(doneSem);
 }
 
+
+/*
+ * Balloon waits on balloonFreeCv which signals that all ropes have been severed and balloon is free.
+ */
 static
 void
 balloon(void *p, unsigned long arg)
@@ -250,7 +283,7 @@ balloon(void *p, unsigned long arg)
 
 	lock_acquire(ropesLeftLock);
 	while (ropes_left > 0) {
-		cv_wait(ropesLeftCv, ropesLeftLock);
+		cv_wait(balloonFreeCv, ropesLeftLock);
 		lock_release(ropesLeftLock);
 	}
 	kprintf("Balloon freed and Prince Dandelion escapes!\n");
@@ -297,7 +330,7 @@ airballoon(int nargs, char **args)
 		goto panic;
 
 
-	// thread_join()
+	// waits for nthreads to finish before moving on
 	for (int i = 0; i < nthreads; i++) {
 		P(doneSem);
 	}
@@ -309,6 +342,6 @@ panic:
 	      strerror(err));
 
 done:
-	// cleanup();
+	cleanup();
 	return 0;
 }
