@@ -1,8 +1,12 @@
 // Question 1
-
+Magic numbers are file type specific numbers that occur at the beginning of a 
+file and identify the file type.
+0x7F 'E' 'L' 'F' (0x7F 0x45 0x4C 0x46)
 
 // Question 2
-
+UIO_USERISPACE corresponds to the memory space for user process instructions 
+and UIO_USERSPACE corresponds to the memory space for user process data.
+UIO_SYSSPACE is used when accessing the memory space for the kernel.
 
 // Question 3
 
