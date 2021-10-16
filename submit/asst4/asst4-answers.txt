@@ -1,41 +1,85 @@
 // Question 1
-
+/* For e_ident[EI_MAG0..3] */
+#define	ELFMAG0		0x7f
+#define	ELFMAG1		'E'
+#define	ELFMAG2		'L'
+#define	ELFMAG3		'F'
+/*
+ * Check to make sure it's a 32-bit ELF-version-1 executable
+ * for our processor type. If it's not, we can't run it.
+ *
+ * Ignore EI_OSABI and EI_ABIVERSION - properly, we should
+ * define our own, but that would require tinkering with the
+ * linker to have it emit our magic numbers instead of the
+ * default ones. (If the linker even supports these fields,
+ * which were not in the original elf spec.)
+ */
 
 // Question 2
-
+loadelf.c
 
 // Question 3
-
+uio.h
+vnode_check() in vnode.c
+result = VOP_READ(v, &u); is returned
+VOP_READ is emufs_read() in emu.c
+uio is passed in as an argument
+emu_read() is called and the result is returned
+which calls emu_doread()
+which calls emu_wreg() which writes
+uiomove() may be called repeatedly on the same uio to transfer
+additional data until the available buffer space the uio refers to
+is exhausted.
 
 // Question 4
-
+runprogram.c
+When you write to a file the OS doesn’t actually write to the file right away. Instead it often buffers the data in memory and writes to it when it has time, or when another process isn’t writing to the disk. You can call flush() to flush the file to the disk.
+When a file is open the operating system has to keep track of it and this uses some resources. Closing the file releases the resources. On a large system running many process you can use up all of the resources to keep track of open files. This may prevent any process from opening another file. When the process ends or crashes the OS is supposed to clean up for you.
+If your program crashes or hangs before closing the file, the file may not be closed correctly. This can cause you to loose all or some of the data in the file.
+If another process wants to read a file, it may be prevented from reading an open file. This depends on how you open the file.
 
 // Question 5
-
+trapframe.h
+/*
+ * Function to enter user mode. Does not return. The trapframe must
+ * be on the thread's own stack or bad things will happen.
+ */
+__DEAD void mips_usermode(struct trapframe *tf);
 
 // Question 6
-
+copyinout.c
+memmove.c
+b/c of setjump ?? context switch needed?? idk
 
 // Question 7
-
+Define userptr_t as a pointer to a one-byte struct, so it won't mix
+with other pointers.
+typesafety to differentiate kernel pointers from user pointers
 
 // Question 8
-
+errno.h
+#define ENOSYS          1      /* Function not implemented */
 
 // Question 9
-
+line 141 in syscall.c increments program counter by 4 which implies instructions are 4 bytes.
 
 // Question 10
-
+trap.c
+because currently the system just panics and dies without handling the fatal fault
 
 // Question 11
-
+First 4 arguments are on registers a0-a3
+any additional arguments would have to be fetched from the user level stack starting at sp+16 to skip over the slots for the registerized values with copyin()
 
 // Question 12
-
+line 50 in syscalls.S
+Definition for each syscall.
+ * All we do is load the syscall number into v0, the register the
+ * kernel expects to find it in, and jump to the shared syscall code.
+ * (Note that the addiu instruction is in the jump's delay slot.)
 
 // Question 13
-
+syscall on line 85 in syscalls.S ??
 
 // Question 14
 
