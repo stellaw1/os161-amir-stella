@@ -41,6 +41,20 @@
 
 struct addrspace;
 struct vnode;
+struct lock;
+
+struct open_file
+{
+	struct vnode *vn;
+	int offset;
+    int flags;
+	struct lock *fd_lock;
+}
+
+struct open_file_table
+{
+    struct open_file table[OPEN_MAX];
+}
 
 /*
  * Process structure.
@@ -56,7 +70,7 @@ struct proc {
 	/* VFS */
 	struct vnode *p_cwd;		/* current working directory */
 
-	/* add more material here as needed */
+	struct open_file_table *oft;
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */

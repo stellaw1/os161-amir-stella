@@ -48,6 +48,7 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
+#include <unistd.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -81,6 +82,14 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
+
+	/* initialize open file table for this process */
+	proc->oft = kmalloc(sizeof(struct open_file_table));
+	if (proc->oft == NULL) {
+		kfree(proc->p_name);
+		kfree(proc);
+		return NULL;
+	}
 
 	return proc;
 }
@@ -169,6 +178,13 @@ proc_destroy(struct proc *proc)
 	spinlock_cleanup(&proc->p_lock);
 
 	kfree(proc->p_name);
+	for (int i = 0; i < OPEN_MAX; i++) {
+		kfree(proc->oft[i]->fd_lock);
+		proc->oft[i]->fd_lock = NULL;
+		kfree(proc->oft[i]);
+		proc->oft[i] = NULL;
+	}
+	kfree(proc->oft);
 	kfree(proc);
 }
 
@@ -217,6 +233,42 @@ proc_create_runprogram(const char *name)
 		newproc->p_cwd = curproc->p_cwd;
 	}
 	spinlock_release(&curproc->p_lock);
+
+	struct open_file *stdin = kmalloc(sizeof(struct open_file));
+	if (stdin == NULL) {
+		kfree(proc->oft);
+		kfree(proc->p_name);
+		kfree(proc);
+		return NULL;
+	}
+	stdin->offset = 0;
+	stdin->vn = NULL;
+	proc->oft[STDIN_FILENO] = stdin;
+
+	struct open_file *stdout = kmalloc(sizeof(struct open_file));
+	if (stdin == NULL) {
+		kfree(proc->oft[STDIN_FILENO]);
+		kfree(proc->oft);
+		kfree(proc->p_name);
+		kfree(proc);
+		return NULL;
+	}
+	stdout->offset = 0;
+	stdout->vn = NULL;
+	proc->oft[STDOUT_FILENO] = stdout;
+
+	struct open_file *stderr = kmalloc(sizeof(struct open_file));
+	if (stdin == NULL) {
+		kfree(proc->oft[STDOUT_FILENO]);
+		kfree(proc->oft[STDIN_FILENO]);
+		kfree(proc->oft);
+		kfree(proc->p_name);
+		kfree(proc);
+		return NULL;
+	}
+	stderr->offset = 0;
+	stderr->vn = NULL;
+	proc->oft[STDERR_FILENO] = stderr;
 
 	return newproc;
 }
