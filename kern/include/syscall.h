@@ -59,4 +59,12 @@ __DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,
 int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 
+
+/*
+ * Asst 4 funciton defs
+ */
+
+int sys_open(const char *filename, int flags);
+int sys_close(int fd);
+
 #endif /* _SYSCALL_H_ */
