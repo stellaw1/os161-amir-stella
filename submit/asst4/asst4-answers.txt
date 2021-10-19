@@ -89,11 +89,13 @@ Definition for each syscall.
 syscall on line 85 in syscalls.S ??
 
 // Question 14
-
+arg0 is found in register a0, arg1 is found in registers a2/a3 and arg2 is found in the user-level stack starting at sp+16. arg2 is fetched from the user stack using copyin(sp+16). the 64-bit return value is returned using the resiters v0 and v1. register a3 is also set to 0 to indicate success or 1 to indicate failure
 
 // Question 15
-
+in runprogram(), vfs_open() is called to open the file
+in load_elf(), the macro VOP_READ is called to read the file
+similarily, VOP_WRITE is called to write to a file
+file descriptors are used to represent open files in the kernel
 
 // Question 16
-
-
+VOP_INCREF/ VOP_DECREF is used to increment/ decrement the counter in a vnode that is used to track the number of decriptors that are pointing to that file currently.
