@@ -60,7 +60,7 @@ struct vnode {
 };
 
 /*
- * Abstract operations on a vnode.
+ * Abstract operations on a vnode defined in emu.c.
  *
  * These are used in the form VOP_FOO(vnode, args), which are macros
  * that expands to vnode->vn_ops->vop_foo(vnode, args). The operations

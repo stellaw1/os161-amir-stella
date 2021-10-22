@@ -63,8 +63,7 @@ int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 /*
  * Asst 4 funciton defs
  */
-
-int open(const char *filename, int flags, mode_t mode);
+int open(char *filename, int flags, mode_t mode);
 /*int read(int fd, void *buf, size_t buflen);
 int write(int fd, void *buf, size_t buflen);
 int lseek(int fd, off_t pos, int whence);
