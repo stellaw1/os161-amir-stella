@@ -49,6 +49,7 @@
 #include <addrspace.h>
 #include <vnode.h>
 #include <unistd.h>
+#include <vfs.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -90,6 +91,14 @@ proc_create(const char *name)
 		kfree(proc);
 		return NULL;
 	}
+
+    proc->oft->table_lock = lock_create("table_lock");
+    if (proc->oft->table_lock == NULL) {
+        kfree(proc->oft);
+        kfree(proc->p_name);
+		kfree(proc);
+		return NULL;
+    }
 
 	return proc;
 }
@@ -179,13 +188,16 @@ proc_destroy(struct proc *proc)
 
 	kfree(proc->p_name);
 	for (int i = 0; i < OPEN_MAX; i++) {
+		if (proc->oft[i] == NULL) {
+			continue;
+		}
 		kfree(proc->oft[i]->fd_lock);
-		proc->oft[i]->fd_lock = NULL;
 		kfree(proc->oft[i]);
-		proc->oft[i] = NULL;
 	}
+    kfree(proc->oft->table_lock);
 	kfree(proc->oft);
 	kfree(proc);
+    proc = NULL;
 }
 
 /*
@@ -236,17 +248,18 @@ proc_create_runprogram(const char *name)
 
 	struct open_file *stdin = kmalloc(sizeof(struct open_file));
 	if (stdin == NULL) {
+		kfree(proc->oft->table_lock);
 		kfree(proc->oft);
 		kfree(proc->p_name);
 		kfree(proc);
 		return NULL;
 	}
 	stdin->offset = 0;
-	stdin->vn = NULL;
 	proc->oft[STDIN_FILENO] = stdin;
 
 	struct open_file *stdout = kmalloc(sizeof(struct open_file));
 	if (stdin == NULL) {
+		kfree(proc->oft->table_lock);
 		kfree(proc->oft[STDIN_FILENO]);
 		kfree(proc->oft);
 		kfree(proc->p_name);
@@ -254,11 +267,13 @@ proc_create_runprogram(const char *name)
 		return NULL;
 	}
 	stdout->offset = 0;
+	struct vnode **stdin_vn;
 	stdout->vn = NULL;
 	proc->oft[STDOUT_FILENO] = stdout;
 
 	struct open_file *stderr = kmalloc(sizeof(struct open_file));
 	if (stdin == NULL) {
+		kfree(proc->oft->table_lock);
 		kfree(proc->oft[STDOUT_FILENO]);
 		kfree(proc->oft[STDIN_FILENO]);
 		kfree(proc->oft);
@@ -269,6 +284,18 @@ proc_create_runprogram(const char *name)
 	stderr->offset = 0;
 	stderr->vn = NULL;
 	proc->oft[STDERR_FILENO] = stderr;
+
+	struct vnode **console_vn;
+	int i = vfs_lookup("con:", console_vn);
+	if (i == 0) {
+		proc->oft[STDIN_FILENO]->vn = NULL;
+		proc->oft[STDOUT_FILENO]->vn = NULL;
+		proc->oft[STDERR_FILENO]->vn = NULL;
+	} else {
+		proc->oft[STDIN_FILENO]->vn = *console_vn;
+		proc->oft[STDOUT_FILENO]->vn = *console_vn;
+		proc->oft[STDERR_FILENO]->vn = *console_vn;
+	}
 
 	return newproc;
 }

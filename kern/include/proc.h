@@ -47,13 +47,14 @@ struct open_file
 {
 	struct vnode *vn;
 	int offset;
-    int flags;
+	int flags;
 	struct lock *fd_lock;
 }
 
 struct open_file_table
 {
-    struct open_file table[OPEN_MAX];
+	struct open_file table[OPEN_MAX];
+	struct lock *table_lock;
 }
 
 /*
