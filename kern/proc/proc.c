@@ -50,6 +50,7 @@
 #include <vnode.h>
 #include <unistd.h>
 #include <vfs.h>
+#include <fcntl.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -255,6 +256,7 @@ proc_create_runprogram(const char *name)
 		return NULL;
 	}
 	stdin->offset = 0;
+	stdin->flags = O_RDONLY;
 	proc->oft[STDIN_FILENO] = stdin;
 
 	struct open_file *stdout = kmalloc(sizeof(struct open_file));
@@ -267,8 +269,7 @@ proc_create_runprogram(const char *name)
 		return NULL;
 	}
 	stdout->offset = 0;
-	struct vnode **stdin_vn;
-	stdout->vn = NULL;
+	stdout->flags = O_WRONLY;
 	proc->oft[STDOUT_FILENO] = stdout;
 
 	struct open_file *stderr = kmalloc(sizeof(struct open_file));
@@ -282,7 +283,7 @@ proc_create_runprogram(const char *name)
 		return NULL;
 	}
 	stderr->offset = 0;
-	stderr->vn = NULL;
+	stderr->flags = O_WRONLY;
 	proc->oft[STDERR_FILENO] = stderr;
 
 	struct vnode **console_vn;
