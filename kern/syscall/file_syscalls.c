@@ -7,6 +7,7 @@
 #include <current.h>
 #include <syscall.h>
 #include <synch.h>
+#include <file_syscalls.h>
 
 int open(const char *filename, int flags, mode_t mode) {
 
