@@ -64,7 +64,13 @@ int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
  * Asst 4 funciton defs
  */
 
-int sys_open(const char *filename, int flags);
-int sys_close(int fd);
+int open(const char *filename, int flags);
+int read(int fd, void *buf, size_t buflen);
+int write(int fd, void *buf, size_t buflen);
+int lseek(int fd, off_t pos, int whence);
+int close(int fd);
+int dup2(int oldfd, int newfd);
+int chdir(const char *pathname);
+int __getcwd(char *buf, size_t buflen);
 
 #endif /* _SYSCALL_H_ */
