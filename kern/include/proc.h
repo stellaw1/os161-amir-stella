@@ -39,24 +39,13 @@
 #include <spinlock.h>
 #include <thread.h> /* required for struct threadarray */
 #include <limits.h>
+#include <openfiletable.h>
 
 struct addrspace;
 struct vnode;
-struct lock;
 
-struct open_file
-{
-	struct vnode *vn;
-	int offset;
-	int flags;
-	struct lock *fd_lock;
-};
-
-struct open_file_table
-{
-	struct open_file *table[OPEN_MAX];
-	struct lock *table_lock;
-};
+struct open_file;
+struct open_file_table;
 
 /*
  * Process structure.

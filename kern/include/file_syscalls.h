@@ -3,6 +3,6 @@
 
 #include <cdefs.h>
 
-int open(const char *filename, int flags, mode_t mode);
+int open(char *filename, int flags, mode_t mode);
 
 #endif
