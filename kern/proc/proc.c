@@ -48,9 +48,11 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
-#include <unistd.h>
+#include <kern/unistd.h>
 #include <vfs.h>
-#include <fcntl.h>
+#include <kern/fcntl.h>
+#include <limits.h>
+#include <synch.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -189,11 +191,11 @@ proc_destroy(struct proc *proc)
 
 	kfree(proc->p_name);
 	for (int i = 0; i < OPEN_MAX; i++) {
-		if (proc->oft[i] == NULL) {
+		if (proc->oft->table[i] == NULL) {
 			continue;
 		}
-		kfree(proc->oft[i]->fd_lock);
-		kfree(proc->oft[i]);
+		kfree(proc->oft->table[i]->fd_lock);
+		kfree(proc->oft->table[i]);
 	}
 	kfree(proc->oft->table_lock);
 	kfree(proc->oft);
@@ -249,53 +251,55 @@ proc_create_runprogram(const char *name)
 
 	struct open_file *stdin = kmalloc(sizeof(struct open_file));
 	if (stdin == NULL) {
-		kfree(proc->oft->table_lock);
-		kfree(proc->oft);
-		kfree(proc->p_name);
-		kfree(proc);
+		kfree(newproc->oft->table_lock);
+		kfree(newproc->oft);
+		kfree(newproc->p_name);
+		kfree(newproc);
 		return NULL;
 	}
 	stdin->offset = 0;
 	stdin->flags = O_RDONLY;
-	proc->oft[STDIN_FILENO] = stdin;
+	newproc->oft->table[STDIN_FILENO] = stdin;
 
 	struct open_file *stdout = kmalloc(sizeof(struct open_file));
 	if (stdin == NULL) {
-		kfree(proc->oft->table_lock);
-		kfree(proc->oft[STDIN_FILENO]);
-		kfree(proc->oft);
-		kfree(proc->p_name);
-		kfree(proc);
+		kfree(newproc->oft->table_lock);
+		kfree(newproc->oft->table[STDIN_FILENO]);
+		kfree(newproc->oft);
+		kfree(newproc->p_name);
+		kfree(newproc);
 		return NULL;
 	}
 	stdout->offset = 0;
 	stdout->flags = O_WRONLY;
-	proc->oft[STDOUT_FILENO] = stdout;
+	newproc->oft->table[STDOUT_FILENO] = stdout;
 
 	struct open_file *stderr = kmalloc(sizeof(struct open_file));
 	if (stdin == NULL) {
-		kfree(proc->oft->table_lock);
-		kfree(proc->oft[STDOUT_FILENO]);
-		kfree(proc->oft[STDIN_FILENO]);
-		kfree(proc->oft);
-		kfree(proc->p_name);
-		kfree(proc);
+		kfree(newproc->oft->table_lock);
+		kfree(newproc->oft->table[STDOUT_FILENO]);
+		kfree(newproc->oft->table[STDIN_FILENO]);
+		kfree(newproc->oft);
+		kfree(newproc->p_name);
+		kfree(newproc);
 		return NULL;
 	}
 	stderr->offset = 0;
 	stderr->flags = O_WRONLY;
-	proc->oft[STDERR_FILENO] = stderr;
+	newproc->oft->table[STDERR_FILENO] = stderr;
 
-	struct vnode **console_vn;
-	int i = vfs_lookup("con:", console_vn);
+	struct vnode **console_vn = NULL;
+    char *console_str = NULL;
+    strcpy(console_str, "con:");
+	int i = vfs_lookup(console_str, console_vn);
 	if (i == 0) {
-		proc->oft[STDIN_FILENO]->vn = NULL;
-		proc->oft[STDOUT_FILENO]->vn = NULL;
-		proc->oft[STDERR_FILENO]->vn = NULL;
+		newproc->oft->table[STDIN_FILENO]->vn = NULL;
+		newproc->oft->table[STDOUT_FILENO]->vn = NULL;
+		newproc->oft->table[STDERR_FILENO]->vn = NULL;
 	} else {
-		proc->oft[STDIN_FILENO]->vn = *console_vn;
-		proc->oft[STDOUT_FILENO]->vn = *console_vn;
-		proc->oft[STDERR_FILENO]->vn = *console_vn;
+		newproc->oft->table[STDIN_FILENO]->vn = *console_vn;
+		newproc->oft->table[STDOUT_FILENO]->vn = *console_vn;
+		newproc->oft->table[STDERR_FILENO]->vn = *console_vn;
 	}
 
 	return newproc;
