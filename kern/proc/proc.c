@@ -92,13 +92,13 @@ proc_create(const char *name)
 		return NULL;
 	}
 
-    proc->oft->table_lock = lock_create("table_lock");
-    if (proc->oft->table_lock == NULL) {
-        kfree(proc->oft);
-        kfree(proc->p_name);
+	proc->oft->table_lock = lock_create("table_lock");
+	if (proc->oft->table_lock == NULL) {
+		kfree(proc->oft);
+		kfree(proc->p_name);
 		kfree(proc);
 		return NULL;
-    }
+	}
 
 	return proc;
 }
@@ -194,10 +194,10 @@ proc_destroy(struct proc *proc)
 		kfree(proc->oft[i]->fd_lock);
 		kfree(proc->oft[i]);
 	}
-    kfree(proc->oft->table_lock);
+	kfree(proc->oft->table_lock);
 	kfree(proc->oft);
 	kfree(proc);
-    proc = NULL;
+	proc = NULL;
 }
 
 /*
