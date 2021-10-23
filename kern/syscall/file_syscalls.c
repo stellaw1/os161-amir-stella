@@ -13,8 +13,9 @@
 #include <openfiletable.h>
 #include <limits.h>
 
-int open(char *filename, int flags, mode_t mode) {
-
+int
+open(char *filename, int flags, mode_t mode) 
+{
     struct vnode **ret;
     struct open_file *of;
     
@@ -25,11 +26,12 @@ int open(char *filename, int flags, mode_t mode) {
     
     ret = &ptr1;
 
-    int result = vfs_open(filename, flags, mode, ret);
+    int err = vfs_open(filename, flags, mode, ret);
     
     kfree(ptr1);
         
-    if (result != 0) {
+    if (err) {
+        errno = err;
         return -1;
     }
 
@@ -48,5 +50,26 @@ int open(char *filename, int flags, mode_t mode) {
         }
     }
     lock_release(curproc->oft->table_lock);
+
+    errno = EMFILE;
     return -1;
+}
+
+int
+close(int fd)
+{
+    if (fd < 0 || fd > OPEN_MAX || curproc->oft->table[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+
+    vfs_close(curproc->oft->table[fd]->vn);
+    curproc->oft->table[fd]->refcount--;
+
+    if (curproc->oft->table[fd]->refcount == 0) {
+        open_file_destroy(curproc->oft->table[fd]);
+    }
+
+    curproc->oft->table[fd] = NULL;
+    return 0;
 }
