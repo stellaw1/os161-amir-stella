@@ -21,7 +21,7 @@ open(char *filename, int flags, mode_t mode)
     
     struct vnode *ptr1 = kmalloc(sizeof(struct vnode));
     if (ptr1 == NULL) {
-        return -1;
+        return ;
     }
     
     ret = &ptr1;
@@ -31,14 +31,13 @@ open(char *filename, int flags, mode_t mode)
     kfree(ptr1);
         
     if (err) {
-        errno = err;
-        return -1;
+        return err;
     }
 
     of = open_file_create(*ret, 0, flags, 1);
     
     if (of == NULL) {
-        return -1;
+        return ENOSPC;
     }
 
     lock_acquire(curproc->oft->table_lock);
@@ -51,16 +50,16 @@ open(char *filename, int flags, mode_t mode)
     }
     lock_release(curproc->oft->table_lock);
 
-    errno = EMFILE;
-    return -1;
+    open_file_destroy(of);
+
+    return EMFILE;
 }
 
 int
 close(int fd)
 {
     if (fd < 0 || fd > OPEN_MAX || curproc->oft->table[fd] == NULL) {
-        errno = EBADF;
-        return -1;
+        return EBADF;
     }
 
     vfs_close(curproc->oft->table[fd]->vn);
