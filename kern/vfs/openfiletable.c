@@ -6,6 +6,37 @@
 #include <kern/fcntl.h>
 #include <limits.h>
 
+struct open_file *
+open_file_create(struct vnode *vn, off_t offset, int flags, int refcount)
+{
+    struct open_file *of = kmalloc(sizeof(struct open_file));
+    if (of == NULL) {
+        return NULL;
+    }
+
+    of->flock = lock_create("filelock");
+    if (of->flock == NULL) {
+        kfree(of);
+        return NULL;
+    }
+
+    of->vn = vn;
+    of->offset = offset;
+    of->flags = flags;
+    of->refcount = refcount;
+
+    return of;
+}
+
+void
+open_file_destroy(struct open_file *of)
+{
+    if (of != NULL) {
+        kfree(of->flock);
+        kfree(of);
+    }
+}
+
 struct open_file_table *
 open_file_table_create() 
 {
@@ -90,36 +121,5 @@ open_file_table_destroy(struct open_file_table *oft) {
             continue;
         }
         open_file_destroy(oft->table[i]);
-    }
-}
-
-struct open_file *
-open_file_create(struct vnode *vn, off_t offset, int flags, int refcount)
-{
-    struct open_file *of = kmalloc(sizeof(struct open_file));
-    if (of == NULL) {
-        return NULL;
-    }
-
-    of->flock = lock_create("filelock");
-    if (of->flock == NULL) {
-        kfree(of);
-        return NULL;
-    }
-
-    of->vn = vn;
-    of->offset = offset;
-    of->flags = flags;
-    of->refcount = refcount;
-
-    return of;
-}
-
-void
-open_file_destroy(struct open_file *of)
-{
-    if (of != NULL) {
-        kfree(of->flock);
-        kfree(of);
     }
 }

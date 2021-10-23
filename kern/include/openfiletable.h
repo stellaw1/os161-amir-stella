@@ -2,12 +2,9 @@
 #define _OPENFILETABLE_H_
 
 #include <types.h>
-#include <spinlock.h>
+#include <synch.h>
 #include <limits.h>
-
-struct addrspace;
-struct vnode;
-struct spinlock;
+#include <vnode.h>
 
 struct open_file
 {
@@ -25,9 +22,11 @@ struct open_file_table
 };
 
 struct open_file_table * open_file_table_create();
+
 void open_file_table_destroy(struct open_file_table *oft);
 
 struct open_file * open_file_create();
+
 void open_file_destroy(struct open_file *of);
 
 #endif /* _OPENFILETABLE_H_ */
