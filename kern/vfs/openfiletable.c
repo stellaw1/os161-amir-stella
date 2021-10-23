@@ -20,7 +20,7 @@ open_file_table_create()
         return NULL;
     }
     
-    char *console_path = "con:";
+    char console_path[] = "con:";
     struct vnode **stdin_vn;
     struct vnode **stdout_vn;
     *stdin_vn = kmalloc(sizeof(struct vnode));
@@ -103,13 +103,15 @@ open_file_create(struct vnode *vn, off_t offset, int flags, int refcount)
 
     of->flock = lock_create("filelock");
     if (of->flock == NULL) {
-        kfree(open_file);
+        kfree(of);
         return NULL;
     }
 
     of->offset = offset;
-    of-flags = flags;
+    of->flags = flags;
     of->refcount = refcount;
+
+    return of;
 }
 
 void
