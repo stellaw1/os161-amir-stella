@@ -54,23 +54,27 @@ open_file_table_create()
     char console_path[] = "con:";
     struct vnode **stdin_vn;
     struct vnode **stdout_vn;
-    *stdin_vn = kmalloc(sizeof(struct vnode));
-    if (*stdin_vn == NULL) {
+    struct vnode *ptr1 = kmalloc(sizeof(struct vnode));
+    if (ptr1 == NULL) {
         lock_destroy(oft->table_lock);
         kfree(oft);
         return NULL;
     }
+    stdout_vn = &ptr1;
 
-    *stdout_vn = kmalloc(sizeof(struct vnode));
-    if (*stdout_vn == NULL) {
+    struct vnode *ptr2 = kmalloc(sizeof(struct vnode));
+    if (ptr2 == NULL) {
         lock_destroy(oft->table_lock);
         kfree(oft);
-        kfree(*stdin_vn);
+        kfree(ptr1);
         return NULL;
     }
 
     int err_stdin = vfs_open(console_path, O_RDONLY, 0, stdin_vn);
     int err_stdout = vfs_open(console_path, O_WRONLY, 0, stdout_vn);
+
+    kfree(ptr1);
+    kfree(ptr2);
 
     if (err_stdin != 0 || err_stdout != 0) {
         lock_destroy(oft->table_lock);
