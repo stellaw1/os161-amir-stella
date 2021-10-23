@@ -25,7 +25,7 @@ struct open_file_table *open_file_table_create(void);
 
 void open_file_table_destroy(struct open_file_table *oft);
 
-struct open_file *open_file_create(void);
+struct open_file *open_file_create(struct vnode *vn, off_t offset, int flags, int refcount);
 
 void open_file_destroy(struct open_file *of);
 
