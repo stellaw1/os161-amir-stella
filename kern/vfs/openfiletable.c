@@ -78,7 +78,7 @@ open_file_table_create()
         return NULL;
     }
 
-    struct open_file *stdin_of = open_file_create(*stdin_vn, 0, 0, O_RDONLY, 1);
+    struct open_file *stdin_of = open_file_create(*stdin_vn, 0, O_RDONLY, 1);
     if (stdin_of == NULL) {
         lock_destroy(oft->table_lock);
         kfree(oft);
