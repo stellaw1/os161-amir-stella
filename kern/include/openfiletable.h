@@ -21,11 +21,11 @@ struct open_file_table
 	struct lock *table_lock;
 };
 
-struct open_file_table *open_file_table_create();
+struct open_file_table *open_file_table_create(void);
 
 void open_file_table_destroy(struct open_file_table *oft);
 
-struct open_file *open_file_create();
+struct open_file *open_file_create(void);
 
 void open_file_destroy(struct open_file *of);
 
