@@ -48,11 +48,7 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
-#include <kern/unistd.h>
-#include <vfs.h>
-#include <kern/fcntl.h>
-#include <limits.h>
-#include <synch.h>
+#include <openfiletable.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -86,22 +82,6 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
-
-	/* initialize open file table for this process */
-	proc->oft = kmalloc(sizeof(struct open_file_table));
-	if (proc->oft == NULL) {
-		kfree(proc->p_name);
-		kfree(proc);
-		return NULL;
-	}
-
-	proc->oft->table_lock = lock_create("table_lock");
-	if (proc->oft->table_lock == NULL) {
-		kfree(proc->oft);
-		kfree(proc->p_name);
-		kfree(proc);
-		return NULL;
-	}
 
 	return proc;
 }
@@ -190,17 +170,8 @@ proc_destroy(struct proc *proc)
 	spinlock_cleanup(&proc->p_lock);
 
 	kfree(proc->p_name);
-	for (int i = 0; i < OPEN_MAX; i++) {
-		if (proc->oft->table[i] == NULL) {
-			continue;
-		}
-		kfree(proc->oft->table[i]->fd_lock);
-		kfree(proc->oft->table[i]);
-	}
-	kfree(proc->oft->table_lock);
-	kfree(proc->oft);
-	kfree(proc);
-	proc = NULL;
+	
+	open_file_table_destroy(proc->oft);
 }
 
 /*
@@ -249,57 +220,10 @@ proc_create_runprogram(const char *name)
 	}
 	spinlock_release(&curproc->p_lock);
 
-	struct open_file *stdin = kmalloc(sizeof(struct open_file));
-	if (stdin == NULL) {
-		kfree(newproc->oft->table_lock);
-		kfree(newproc->oft);
-		kfree(newproc->p_name);
-		kfree(newproc);
+	newproc->oft = open_file_table_create();
+	if (newproc->oft == NULL) {
+		proc_destroy(newproc);
 		return NULL;
-	}
-	stdin->offset = 0;
-	stdin->flags = O_RDONLY;
-	newproc->oft->table[STDIN_FILENO] = stdin;
-
-	struct open_file *stdout = kmalloc(sizeof(struct open_file));
-	if (stdin == NULL) {
-		kfree(newproc->oft->table_lock);
-		kfree(newproc->oft->table[STDIN_FILENO]);
-		kfree(newproc->oft);
-		kfree(newproc->p_name);
-		kfree(newproc);
-		return NULL;
-	}
-	stdout->offset = 0;
-	stdout->flags = O_WRONLY;
-	newproc->oft->table[STDOUT_FILENO] = stdout;
-
-	struct open_file *stderr = kmalloc(sizeof(struct open_file));
-	if (stdin == NULL) {
-		kfree(newproc->oft->table_lock);
-		kfree(newproc->oft->table[STDOUT_FILENO]);
-		kfree(newproc->oft->table[STDIN_FILENO]);
-		kfree(newproc->oft);
-		kfree(newproc->p_name);
-		kfree(newproc);
-		return NULL;
-	}
-	stderr->offset = 0;
-	stderr->flags = O_WRONLY;
-	newproc->oft->table[STDERR_FILENO] = stderr;
-
-	struct vnode **console_vn = NULL;
-    char *console_str = NULL;
-    strcpy(console_str, "con:");
-	int i = vfs_lookup(console_str, console_vn);
-	if (i == 0) {
-		newproc->oft->table[STDIN_FILENO]->vn = NULL;
-		newproc->oft->table[STDOUT_FILENO]->vn = NULL;
-		newproc->oft->table[STDERR_FILENO]->vn = NULL;
-	} else {
-		newproc->oft->table[STDIN_FILENO]->vn = *console_vn;
-		newproc->oft->table[STDOUT_FILENO]->vn = *console_vn;
-		newproc->oft->table[STDERR_FILENO]->vn = *console_vn;
 	}
 
 	return newproc;

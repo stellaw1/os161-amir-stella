@@ -116,11 +116,11 @@ syscall(struct trapframe *tf)
 				tf->tf_a1,
                 (mode_t)tf->tf_a2);
 		break;
-/*
+
 		case SYS_close:
-		err = close(tf->tf_a0);
+		err = close((int)tf->tf_a0);
 		break;
-*/
+
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;

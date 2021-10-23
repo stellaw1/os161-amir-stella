@@ -4,5 +4,6 @@
 #include <cdefs.h>
 
 int open(char *filename, int flags, mode_t mode);
+int close(int fd);
 
 #endif
