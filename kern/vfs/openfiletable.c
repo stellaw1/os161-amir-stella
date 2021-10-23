@@ -54,7 +54,7 @@ open_file_table_create()
         return NULL;
     }
 
-    struct open_file *stdout_of = open_file_create(stdout_vn, 0, 0, O_WRONLY, 1);
+    struct open_file *stdout_of = open_file_create(stdout_vn, 0, O_WRONLY, 1);
     if (stdout_of == NULL) {
         open_file_destroy(stdin_of);
         lock_destroy(oft->table_lock);
@@ -62,7 +62,7 @@ open_file_table_create()
         return NULL;
     }
 
-    struct open_file *stderr_of = open_file_create(stdout_vn, 0, 0, O_WRONLY, 1);
+    struct open_file *stderr_of = open_file_create(stdout_vn, 0, O_WRONLY, 1);
     if (stderr_of == NULL) {
         open_file_destroy(stdin_of);
         open_file_destroy(stdout_of);
@@ -94,7 +94,7 @@ open_file_table_destroy(struct open_file_table *oft) {
 }
 
 struct open_file *
-open_file_create(struct vnode *vn, off_t offset, mode_t mode, int flags, int refcount)
+open_file_create(struct vnode *vn, off_t offset, int flags, int refcount)
 {
     struct open_file *of = kmalloc(sizeof(struct open_file));
     if (of == NULL) {
@@ -108,7 +108,6 @@ open_file_create(struct vnode *vn, off_t offset, mode_t mode, int flags, int ref
     }
 
     of->offset = offset;
-    of->mode = mode;
     of-flags = flags;
     of->refcount = refcount;
 }
