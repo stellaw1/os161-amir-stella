@@ -78,14 +78,14 @@ open_file_table_create()
         return NULL;
     }
 
-    struct open_file *stdin_of = open_file_create(stdin_vn, 0, 0, O_RDONLY, 1);
+    struct open_file *stdin_of = open_file_create(*stdin_vn, 0, 0, O_RDONLY, 1);
     if (stdin_of == NULL) {
         lock_destroy(oft->table_lock);
         kfree(oft);
         return NULL;
     }
 
-    struct open_file *stdout_of = open_file_create(stdout_vn, 0, O_WRONLY, 1);
+    struct open_file *stdout_of = open_file_create(*stdout_vn, 0, O_WRONLY, 1);
     if (stdout_of == NULL) {
         open_file_destroy(stdin_of);
         lock_destroy(oft->table_lock);
@@ -93,7 +93,7 @@ open_file_table_create()
         return NULL;
     }
 
-    struct open_file *stderr_of = open_file_create(stdout_vn, 0, O_WRONLY, 1);
+    struct open_file *stderr_of = open_file_create(*stdout_vn, 0, O_WRONLY, 1);
     if (stderr_of == NULL) {
         open_file_destroy(stdin_of);
         open_file_destroy(stdout_of);
