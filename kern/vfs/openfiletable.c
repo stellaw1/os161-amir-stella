@@ -60,7 +60,7 @@ open_file_table_create()
         kfree(oft);
         return NULL;
     }
-    stdout_vn = &ptr1;
+    stdin_vn = &ptr1;
 
     struct vnode *ptr2 = kmalloc(sizeof(struct vnode));
     if (ptr2 == NULL) {
@@ -69,6 +69,7 @@ open_file_table_create()
         kfree(ptr1);
         return NULL;
     }
+    stdout_vn = &ptr1;
 
     int err_stdin = vfs_open(console_path, O_RDONLY, 0, stdin_vn);
     int err_stdout = vfs_open(console_path, O_WRONLY, 0, stdout_vn);
