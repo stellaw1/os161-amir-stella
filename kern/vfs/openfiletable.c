@@ -51,7 +51,8 @@ open_file_table_create()
         return NULL;
     }
     
-    char console_path[] = "con:";
+    char read_console_path[] = "con:";
+    char write_console_path[] = "con:";
     struct vnode **stdin_vn;
     struct vnode **stdout_vn;
     struct vnode *ptr1 = kmalloc(sizeof(struct vnode));
@@ -71,8 +72,8 @@ open_file_table_create()
     }
     stdout_vn = &ptr1;
 
-    int err_stdin = vfs_open(console_path, O_RDONLY, 0, stdin_vn);
-    int err_stdout = vfs_open(console_path, O_WRONLY, 0, stdout_vn);
+    int err_stdin = vfs_open(read_console_path, O_RDONLY, 0, stdin_vn);
+    int err_stdout = vfs_open(write_console_path, O_WRONLY, 0, stdout_vn);
 
     kfree(ptr1);
     kfree(ptr2);
