@@ -171,7 +171,7 @@ proc_destroy(struct proc *proc)
 
 	kfree(proc->p_name);
 	
-	open_file_table_destroy();
+	open_file_table_destroy(proc->oft);
 }
 
 /*
