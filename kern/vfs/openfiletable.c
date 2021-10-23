@@ -107,6 +107,7 @@ open_file_create(struct vnode *vn, off_t offset, int flags, int refcount)
         return NULL;
     }
 
+    of->vn = vn;
     of->offset = offset;
     of->flags = flags;
     of->refcount = refcount;
