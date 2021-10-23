@@ -21,7 +21,7 @@ open(char *filename, int flags, mode_t mode)
     
     struct vnode *ptr1 = kmalloc(sizeof(struct vnode));
     if (ptr1 == NULL) {
-        return ;
+        return ENOSPC;
     }
     
     ret = &ptr1;
