@@ -12,31 +12,56 @@
 #include <vfs.h>
 #include <openfiletable.h>
 #include <limits.h>
+#include <copyinout.h>
 
 int
 open(char *filename, int flags, mode_t mode) 
 {
+    char *kern_filename = kmalloc(sizeof(char) * PATH_MAX);
+    if (kern_filename == NULL) {
+        return ENOSPC;
+    }
+    size_t *path_len = kmalloc(sizeof(size_t));
+    if (path_len == NULL) {
+        kfree(kern_filename);
+        return ENOSPC;
+    }
+
+    int err = copyinstr((const_userptr_t)filename, kern_filename, PATH_MAX, path_len);
+
+    if (err) {
+        kfree(path_len);
+        kfree(kern_filename);
+        return err;
+    }
+
     struct vnode **ret;
     struct open_file *of;
     
     struct vnode *ptr1 = kmalloc(sizeof(struct vnode));
     if (ptr1 == NULL) {
+        kfree(path_len);
+        kfree(kern_filename);
         return ENOSPC;
     }
     
     ret = &ptr1;
 
-    int err = vfs_open(filename, flags, mode, ret);
+    err = vfs_open(kern_filename, flags, mode, ret);
     
     kfree(ptr1);
         
     if (err) {
+        kfree(path_len);
+        kfree(kern_filename);
         return err;
     }
 
     of = open_file_create(*ret, 0, flags, 1);
     
     if (of == NULL) {
+        kfree(path_len);
+        kfree(kern_filename);
         return ENOSPC;
     }
 
@@ -44,6 +69,8 @@ open(char *filename, int flags, mode_t mode)
     for (int i = 0; i < OPEN_MAX; i++) {
         if (curproc->oft->table[i] == NULL) {
             curproc->oft->table[i] = of;
+            kfree(kern_filename);
+            kfree(path_len);
             lock_release(curproc->oft->table_lock);
             return 0;
         }
@@ -51,6 +78,8 @@ open(char *filename, int flags, mode_t mode)
     lock_release(curproc->oft->table_lock);
 
     open_file_destroy(of);
+    kfree(kern_filename);
+    kfree(path_len);
 
     return EMFILE;
 }
@@ -58,7 +87,7 @@ open(char *filename, int flags, mode_t mode)
 int
 close(int fd)
 {
-    if (fd < 0 || fd > OPEN_MAX || curproc->oft->table[fd] == NULL) {
+    if (fd < 0 || fd >= OPEN_MAX || curproc->oft->table[fd] == NULL) {
         return EBADF;
     }
 
