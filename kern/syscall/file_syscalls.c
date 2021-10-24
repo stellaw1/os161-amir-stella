@@ -91,13 +91,15 @@ close(int fd)
         return EBADF;
     }
 
+    lock_acquire(curproc->oft->table_lock);
     vfs_close(curproc->oft->table[fd]->vn);
     curproc->oft->table[fd]->refcount--;
 
     if (curproc->oft->table[fd]->refcount == 0) {
         open_file_destroy(curproc->oft->table[fd]);
     }
-
     curproc->oft->table[fd] = NULL;
+    lock_release(curproc->oft->table_lock);
+
     return 0;
 }
