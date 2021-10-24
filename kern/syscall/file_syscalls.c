@@ -13,6 +13,8 @@
 #include <openfiletable.h>
 #include <limits.h>
 #include <copyinout.h>
+#include <uio.h>
+#include <kern/iovec.h>
 
 int
 open(char *filename, int flags, mode_t mode) 
@@ -99,5 +101,77 @@ close(int fd)
     }
 
     curproc->oft->table[fd] = NULL;
+    return 0;
+}
+
+ssize_t
+read(int fd, void *buf, size_t buflen)
+{
+    if (fd < 0 || fd >= OPEN_MAX) {
+        return EBADF;
+    }
+    
+    struct open_file *of;
+
+    lock_acquire(curproc->oft->table_lock);
+    if (curproc->oft->table[fd] == NULL) {
+        return EBADF;
+    } else {
+        of = curproc->oft->table[fd];
+    }
+    lock_release(curproc->oft->table_lock);
+    
+    int result;
+    char kbuf[buflen];
+    struct iovec *iov = kmalloc(sizeof(struct iovec));
+    struct uio *myuio = kmalloc(sizeof(struct uio));
+    uio_kinit(iov, myuio, kbuf, buflen, of->offset, UIO_READ);
+
+    result = VOP_READ(of->vn, myuio);
+    if (result) {
+        return result;
+    }
+
+    result = copyout(iov->iov_kbase, (userptr_t) buf, buflen);
+    if (result) {
+        return result;
+    }
+
+    return 0;
+}
+
+ssize_t 
+write(int fd, const void *buf, size_t nbytes) 
+{
+    if (fd < 0 || fd >= OPEN_MAX) {
+        return EBADF;
+    }
+    
+    struct open_file *of;
+
+    lock_acquire(curproc->oft->table_lock);
+    if (curproc->oft->table[fd] == NULL) {
+        return EBADF;
+    } else {
+        of = curproc->oft->table[fd];
+    }
+    lock_release(curproc->oft->table_lock);
+
+    int result;
+    char kbuf[nbytes];
+    struct iovec *iov = kmalloc(sizeof(struct iovec));
+    struct uio *myuio = kmalloc(sizeof(struct uio));
+    uio_kinit(iov, myuio, kbuf, nbytes, of->offset, UIO_WRITE);
+
+    result = copyin((const_userptr_t) buf, iov->iov_kbase, nbytes);
+    if (result) {
+        return result;
+    }
+
+    result = VOP_WRITE(of->vn, myuio);
+    if (result) {
+        return result;
+    }
+
     return 0;
 }
