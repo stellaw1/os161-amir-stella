@@ -149,7 +149,7 @@ syscall(struct trapframe *tf)
 
 		off_t *ret = kmalloc(sizeof(off_t));
 
-		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, retval, retval_v1);
+		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, (uint32_t) retval, (uint32_t) retval_v1);
 		break;
 
 	    default:
