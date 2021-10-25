@@ -17,10 +17,13 @@
 #include <kern/iovec.h>
 #include <stat.h>
 #include <kern/fcntl.h>
+#include <bswap.c>
 
 int
 open(const_userptr_t filename, int flags, mode_t mode, int *retval) 
 {
+    //check flags
+    
     int result;
     char *kern_filename;
     kern_filename = kmalloc(PATH_MAX);
@@ -94,7 +97,7 @@ close(int fd)
 }
 
 ssize_t
-read(int fd, void *buf, size_t buflen)
+read(int fd, userptr_t buf, size_t buflen)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -132,7 +135,7 @@ read(int fd, void *buf, size_t buflen)
 }
 
 ssize_t 
-write(int fd, const void *buf, size_t nbytes) 
+write(int fd, const_userptr_t buf, size_t nbytes) 
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -170,7 +173,7 @@ write(int fd, const void *buf, size_t nbytes)
 }
 
 off_t
-lseek(int fd, off_t pos, int whence)
+lseek(int fd, off_t pos, int whence, int32_t *retval, int32_t *retval_v1)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -197,10 +200,12 @@ lseek(int fd, off_t pos, int whence)
     switch(whence) {
         case SEEK_SET:
             of->offset = pos;
+            split64to32(of->offset, retval, retval_v1);
             break;
 
         case SEEK_CUR:
             of->offset = of->offset + pos;
+            split64to32(of->offset, retval, retval_v1);
             break;
 
         case SEEK_END: ;
@@ -211,11 +216,14 @@ lseek(int fd, off_t pos, int whence)
             }
             of->offset = statbuf->st_size + pos;
             kfree(statbuf);
+            split64to32(of->offset, retval, retval_v1);
             break;
             
         default: 
             return EINVAL;
     }
 
-    return of->offset;
+    return 0;
 }
+
+
