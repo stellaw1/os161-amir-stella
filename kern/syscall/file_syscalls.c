@@ -60,7 +60,7 @@ open(char *filename, int flags, mode_t mode)
         return err;
     }
 
-    of = open_file_create(*ret, 0, flags, 1);
+    of = open_file_create(*ret, flags);
     
     if (of == NULL) {
         kfree(path_len);
