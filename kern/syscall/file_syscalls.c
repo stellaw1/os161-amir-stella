@@ -17,7 +17,7 @@
 #include <kern/iovec.h>
 #include <stat.h>
 #include <kern/fcntl.h>
-#include <bswap.c>
+#include <endian.h>
 
 int
 open(const_userptr_t filename, int flags, mode_t mode, int *retval) 
@@ -84,11 +84,15 @@ open(const_userptr_t filename, int flags, mode_t mode, int *retval)
 int
 close(int fd)
 {
-    if (fd < 0 || fd >= OPEN_MAX || curproc->oft->table[fd] == NULL) {
+    if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
     }
 
     lock_acquire(curproc->oft->table_lock);
+    if (curproc->oft->table[fd] == NULL) {
+        lock_release(curproc->oft->table_lock);
+        return EBADF;
+    }
     open_file_decref(curproc->oft->table[fd]);
     curproc->oft->table[fd] = NULL;
     lock_release(curproc->oft->table_lock);
