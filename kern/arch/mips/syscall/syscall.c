@@ -36,6 +36,9 @@
 #include <current.h>
 #include <syscall.h>
 #include <file_syscalls.h>
+#include <copyinout.h>
+#include <uio.h>
+#include <kern/iovec.h>
 
 
 /*
@@ -112,13 +115,37 @@ syscall(struct trapframe *tf)
 
 	    /* Add stuff here */
 		case SYS_open:
-		err = open((char *)tf->tf_a0,
+		err = open((userptr_t)tf->tf_a0,
 				tf->tf_a1,
                 (mode_t)tf->tf_a2);
 		break;
 
 		case SYS_close:
 		err = close((int)tf->tf_a0);
+		break;
+
+		case SYS_read:
+		err = read(tf->tf_a0, (void *) tf->tf_a1, (size_t) tf->tf_a2);
+		break;
+
+		case SYS_write:
+		err = write(tf->tf_a0, (void *) tf->tf_a1, (size_t) tf->tf_a2);
+		break;
+
+		case SYS_lseek: ;
+		//second argument off_t pos is 64 bits so exists in registers a2/a3
+		//third argument int whence exists on the user stack
+		const_userptr_t arg_addr = (const_userptr_t) tf->tf_sp + 16;
+		int *whence_buf = kmalloc(sizeof(int));
+		struct iovec *iov = kmalloc(sizeof(struct iovec));
+		struct uio *myuio = kmalloc(sizeof(struct uio));
+		uio_kinit(iov, myuio, whence_buf, 4, 0, UIO_WRITE);
+		
+		err = copyin(arg_addr, iov->iov_kbase, 4);
+		if (err) {
+			break;
+		}
+		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf);
 		break;
 
 	    default:
