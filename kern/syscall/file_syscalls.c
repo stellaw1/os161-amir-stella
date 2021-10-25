@@ -177,7 +177,7 @@ write(int fd, const_userptr_t buf, size_t nbytes)
 }
 
 off_t
-lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
+lseek(int fd, off_t pos, int whence, int *retval, int *retval_v1)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -204,12 +204,12 @@ lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
     switch(whence) {
         case SEEK_SET:
             of->offset = pos;
-            split64to32(of->offset, retval, retval_v1);
+            split64to32(of->offset, (uint32_t *)retval, (uint32_t *)retval_v1);
             break;
 
         case SEEK_CUR:
             of->offset = of->offset + pos;
-            split64to32(of->offset, retval, retval_v1);
+            split64to32(of->offset, (uint32_t *)retval, (uint32_t *)retval_v1);
             break;
 
         case SEEK_END: ;
@@ -220,7 +220,7 @@ lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
             }
             of->offset = statbuf->st_size + pos;
             kfree(statbuf);
-            split64to32(of->offset, retval, retval_v1);
+            split64to32(of->offset, (uint32_t *)retval, (uint32_t *)retval_v1);
             break;
             
         default: 
