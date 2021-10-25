@@ -18,12 +18,18 @@ struct open_file_table
 	struct lock *table_lock;
 };
 
+
 /*
- * functions
+ * construction/ destruction functions
  */
 struct open_file_table *open_file_table_create(void);
 void open_file_table_destroy(struct open_file_table *oft);
 
+/*
+ * Generates special file descriptors 0, 1, and 2 that are used for stdin, stdout, and stderr
+ *
+ * returns:     0 on success and an errcode or -1 otherwise
+ */
 int special_fd_create(struct open_file_table *oft);
 
 

@@ -19,6 +19,16 @@
 #include <kern/fcntl.h>
 #include <bswap.c>
 
+/*
+ * open a file
+ * ------------
+ *
+ * filename:    pathname of file/kernel obj
+ * flags:       specifies how to open the file
+ * mode:        provides the file permissions to use
+ * 
+ * returns:     a nonnegative file handle on success and -1 or errno on error
+ */
 int
 open(const_userptr_t filename, int flags, mode_t mode) 
 {
@@ -80,6 +90,14 @@ open(const_userptr_t filename, int flags, mode_t mode)
     return EMFILE;
 }
 
+/*
+ * close a file
+ * ------------
+ *
+ * fd:          file descriptor of file being closed
+ * 
+ * returns:     0 on success and -1 or error code on error
+ */
 int
 close(int fd)
 {
@@ -100,6 +118,16 @@ close(int fd)
     return 0;
 }
 
+/*
+ * read data from file 
+ * -------------------
+ *
+ * fd:          file descriptor of file to read from
+ * buf:         buffer where read data will be stored
+ * buflen:      maximum number of bytes that will be read from the file
+ * 
+ * returns:     number of bytes read from the file on success and -1 or error code on error
+ */
 ssize_t
 read(int fd, userptr_t buf, size_t buflen)
 {
@@ -138,6 +166,16 @@ read(int fd, userptr_t buf, size_t buflen)
     return 0;
 }
 
+/*
+ * write data to file 
+ * -------------------
+ *
+ * fd:          file descriptor of file to read from
+ * buf:         buffer of data to write to file from
+ * nbytes:      max number of bytes to write to file
+ * 
+ * returns:     number of bytes written to file on success and -1 or error code on error
+ */
 ssize_t 
 write(int fd, const_userptr_t buf, size_t nbytes) 
 {
@@ -176,6 +214,17 @@ write(int fd, const_userptr_t buf, size_t nbytes)
     return 0;
 }
 
+/*
+ * change current position in file
+ * -------------------------------
+ *
+ * fd:          file descriptor of file to read from
+ * pos:         buffer of data to write to file from
+ * whence:      max number of bytes to write to file
+ * 
+ * returns:     number of bytes written to file stored in retval and retval_v1 on success
+ *              returns -1 or error code on error
+ */
 off_t
 lseek(int fd, off_t pos, int whence, int32_t *retval, int32_t *retval_v1)
 {
