@@ -16,52 +16,42 @@
 #include <uio.h>
 #include <kern/iovec.h>
 #include <stat.h>
+#include <kern/fcntl.h>
 
 int
-open(char *filename, int flags, mode_t mode) 
+open(const_userptr_t filename, int flags, mode_t mode) 
 {
-    char *kern_filename = kmalloc(sizeof(char) * PATH_MAX);
+    int result;
+    char *kern_filename;
+    kern_filename = kmalloc(PATH_MAX);
     if (kern_filename == NULL) {
         return ENOSPC;
     }
-    size_t *path_len = kmalloc(sizeof(size_t));
+    size_t *path_len;
+    path_len = kmalloc(sizeof(size_t));
     if (path_len == NULL) {
         kfree(kern_filename);
         return ENOSPC;
     }
 
-    int err = copyinstr((const_userptr_t)filename, kern_filename, PATH_MAX, path_len);
-
-    if (err) {
+    result = copyinstr(filename, kern_filename, PATH_MAX, path_len);
+    if (result) {
         kfree(path_len);
         kfree(kern_filename);
-        return err;
+        return result;
     }
 
-    struct vnode **ret;
+    struct vnode *ret;
     struct open_file *of;
     
-    struct vnode *ptr1 = kmalloc(sizeof(struct vnode));
-    if (ptr1 == NULL) {
+    result = vfs_open(kern_filename, flags, mode, &ret);
+    if (result) {
         kfree(path_len);
         kfree(kern_filename);
-        return ENOSPC;
-    }
-    
-    ret = &ptr1;
-
-    err = vfs_open(kern_filename, flags, mode, ret);
-    
-    kfree(ptr1);
-        
-    if (err) {
-        kfree(path_len);
-        kfree(kern_filename);
-        return err;
+        return result;
     }
 
-    of = open_file_create(*ret, flags);
-    
+    of = open_file_create(ret, flags);
     if (of == NULL) {
         kfree(path_len);
         kfree(kern_filename);

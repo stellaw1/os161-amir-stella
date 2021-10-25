@@ -28,6 +28,10 @@ open_file_table_create()
         return NULL;
     }
 
+    for (int fd = 0; fd < OPEN_MAX; fd++) {
+        oft->table[fd] = NULL;
+    }
+
     return oft;
 }
 
