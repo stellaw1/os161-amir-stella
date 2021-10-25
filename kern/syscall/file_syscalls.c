@@ -15,6 +15,7 @@
 #include <copyinout.h>
 #include <uio.h>
 #include <kern/iovec.h>
+#include <stat.h>
 
 int
 open(char *filename, int flags, mode_t mode) 
@@ -127,7 +128,9 @@ read(int fd, void *buf, size_t buflen)
     struct uio *myuio = kmalloc(sizeof(struct uio));
     uio_kinit(iov, myuio, kbuf, buflen, of->offset, UIO_READ);
 
+    lock_acquire(of->flock);
     result = VOP_READ(of->vn, myuio);
+    lock_release(of->flock);
     if (result) {
         return result;
     }
@@ -168,10 +171,63 @@ write(int fd, const void *buf, size_t nbytes)
         return result;
     }
 
+    lock_acquire(of->flock);
     result = VOP_WRITE(of->vn, myuio);
+    lock_release(of->flock);
     if (result) {
         return result;
     }
 
     return 0;
+}
+
+off_t
+lseek(int fd, off_t pos, int whence)
+{
+    if (fd < 0 || fd >= OPEN_MAX) {
+        return EBADF;
+    }
+
+    if (fd == 0 || fd == 1 || fd == 2) {
+        return ESPIPE;
+    }
+
+    struct open_file *of;
+
+    lock_acquire(curproc->oft->table_lock);
+    if (curproc->oft->table[fd] == NULL) {
+        return EBADF;
+    } else {
+        of = curproc->oft->table[fd];
+    }
+    lock_release(curproc->oft->table_lock);
+
+    if (of->offset < pos) {
+        return EINVAL;
+    }
+
+    switch(whence) {
+        case SEEK_SET:
+            of->offset = pos;
+            break;
+
+        case SEEK_CUR:
+            of->offset = of->offset + pos;
+            break;
+
+        case SEEK_END: ;
+            struct stat *statbuf = kmalloc(sizeof(struct stat));
+            int result = VOP_STAT(of->vn, statbuf);
+            if (result) {
+                return result;
+            }
+            of->offset = statbuf->st_size + pos;
+            kfree(statbuf);
+            break;
+            
+        default: 
+            return EINVAL;
+    }
+
+    return of->offset;
 }
