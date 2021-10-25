@@ -83,7 +83,7 @@ void
 syscall(struct trapframe *tf)
 {
 	int callno;
-	int32_t retval, retval_v1;
+	uint32_t retval, retval_v1;
 	int err;
 
 	KASSERT(curthread != NULL);
@@ -147,9 +147,15 @@ syscall(struct trapframe *tf)
 			break;
 		}
 
-		off_t *ret = kmalloc(sizeof(off_t));
+		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, &retval, &retval_v1);
+		break;
 
-		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, retval, retval_v1);
+		case SYS_chdir: 
+		err = chdir((const_userptr_t) tf->tf_a0);
+		break;
+
+		case SYS___getcwd: 
+		err = __getcwd((userptr_t) tf->tf_a0, (size_t) tf->tf_a1);
 		break;
 
 	    default:

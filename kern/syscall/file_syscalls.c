@@ -17,7 +17,7 @@
 #include <kern/iovec.h>
 #include <stat.h>
 #include <kern/fcntl.h>
-#include <bswap.c>
+#include <endian.h>
 
 /*
  * open a file
@@ -225,8 +225,8 @@ write(int fd, const_userptr_t buf, size_t nbytes)
  * returns:     number of bytes written to file stored in retval and retval_v1 on success
  *              returns -1 or error code on error
  */
-off_t
-lseek(int fd, off_t pos, int whence, int32_t *retval, int32_t *retval_v1)
+int
+lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -269,7 +269,7 @@ lseek(int fd, off_t pos, int whence, int32_t *retval, int32_t *retval_v1)
             }
             of->offset = statbuf->st_size + pos;
             kfree(statbuf);
-            split64to32(of->offset, retval, retval_v1);
+            split64to32((uint64_t) of->offset, retval, retval_v1);
             break;
             
         default: 
@@ -279,4 +279,72 @@ lseek(int fd, off_t pos, int whence, int32_t *retval, int32_t *retval_v1)
     return 0;
 }
 
+/*
+ * changes current directory
+ * -------------------------
+ * 
+ * pathname:    directory to set current process to
+ * 
+ * returns:     0 on success, -1 on error
+ */
+int
+chdir(const_userptr_t pathname)
+{
+    int result;
 
+    char *kern_pathname;
+    kern_pathname = kmalloc(PATH_MAX);
+    if (kern_pathname == NULL) {
+        return ENOSPC;
+    }
+    size_t *path_len;
+    path_len = kmalloc(sizeof(size_t));
+    if (path_len == NULL) {
+        kfree(kern_pathname);
+        return ENOSPC;
+    }
+
+    result = copyinstr(pathname, kern_pathname, PATH_MAX, path_len);
+    if (result) {
+        kfree(path_len);
+        kfree(kern_pathname);
+        return result;
+    }
+
+    result = vfs_chdir(kern_pathname);
+
+    kfree(path_len);
+    kfree(kern_pathname);
+    return result;
+}
+
+/*
+ * get name of current working directory (backend)
+ * -----------------------------------------------
+ * 
+ * buf:         stores the current directory
+ * buflen:      length of data stored in buf
+ * 
+ * returns:     length of data returned on success, -1 or error code on error
+ */
+int
+__getcwd(userptr_t buf, size_t buflen)
+{
+    int result;
+    char kbuf[buflen];
+    struct iovec *iov = kmalloc(sizeof(struct iovec));
+    struct uio *myuio = kmalloc(sizeof(struct uio));
+    uio_kinit(iov, myuio, kbuf, buflen, of->offset, UIO_READ);
+
+    result = vfs_getcwd(myuio);
+    if (result) {
+        return result;
+    }
+
+    result = copyout(iov->iov_kbase, buf, buflen);
+    if (result) {
+        return result;
+    }
+
+    return 0;
+}
