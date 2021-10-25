@@ -177,7 +177,7 @@ write(int fd, const_userptr_t buf, size_t nbytes)
 }
 
 off_t
-lseek(int fd, off_t pos, int whence, int32_t *retval, int32_t *retval_v1)
+lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
