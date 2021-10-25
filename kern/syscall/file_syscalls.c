@@ -19,7 +19,7 @@
 #include <kern/fcntl.h>
 
 int
-open(const_userptr_t filename, int flags, mode_t mode) 
+open(const_userptr_t filename, int flags, mode_t mode, int *retval) 
 {
     int result;
     char *kern_filename;
@@ -65,6 +65,7 @@ open(const_userptr_t filename, int flags, mode_t mode)
             kfree(kern_filename);
             kfree(path_len);
             lock_release(curproc->oft->table_lock);
+            *retval = i;
             return 0;
         }
     }

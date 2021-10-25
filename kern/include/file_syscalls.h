@@ -8,7 +8,7 @@
 /*
  * syscall functions
  */
-int open(const_userptr_t filename, int flags, mode_t mode);
+int open(const_userptr_t filename, int flags, mode_t mode, int *retval);
 int close(int fd);
 ssize_t read(int fd, void *buf, size_t buflen);
 ssize_t write(int fd, const void *buf, size_t nbytes);
