@@ -146,6 +146,11 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
     } else {
         of = curproc->oft->table[fd];
     }
+
+    if (of->flags & O_RDWR == 0 || of->flags & O_WRONLY != 0) {
+        lock_release(curproc->oft->table_lock);
+        return EACCES;
+    }
     lock_release(curproc->oft->table_lock);
     
     int result;
@@ -193,6 +198,11 @@ write(int fd, userptr_t buf, size_t nbytes, int *retval)
         return EBADF;
     } else {
         of = curproc->oft->table[fd];
+    }
+    
+    if (of->flags & O_RDWR == 0 && of->flags & O_WRONLY == 0) {
+        lock_release(curproc->oft->table_lock);
+        return EACCES;
     }
     lock_release(curproc->oft->table_lock);
 
