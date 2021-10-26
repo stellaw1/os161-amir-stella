@@ -19,6 +19,16 @@
 #include <kern/fcntl.h>
 #include <endian.h>
 
+/*
+ * open a file
+ * ------------
+ *
+ * filename:    pathname of file/kernel obj
+ * flags:       specifies how to open the file
+ * mode:        provides the file permissions to use
+ * 
+ * returns:     a nonnegative file handle on success and -1 or errno on error
+ */
 int
 open(const_userptr_t filename, int flags, mode_t mode, int *retval) 
 {
@@ -81,6 +91,14 @@ open(const_userptr_t filename, int flags, mode_t mode, int *retval)
     return EMFILE;
 }
 
+/*
+ * close a file
+ * ------------
+ *
+ * fd:          file descriptor of file being closed
+ * 
+ * returns:     0 on success and -1 or error code on error
+ */
 int
 close(int fd)
 {
@@ -100,6 +118,16 @@ close(int fd)
     return 0;
 }
 
+/*
+ * read data from file 
+ * -------------------
+ *
+ * fd:          file descriptor of file to read from
+ * buf:         buffer where read data will be stored
+ * buflen:      maximum number of bytes that will be read from the file
+ * 
+ * returns:     number of bytes read from the file on success and -1 or error code on error
+ */
 int
 read(int fd, userptr_t buf, size_t buflen, int *retval)
 {
@@ -142,6 +170,16 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
     return 0;
 }
 
+/*
+ * write data to file 
+ * -------------------
+ *
+ * fd:          file descriptor of file to read from
+ * buf:         buffer of data to write to file from
+ * nbytes:      max number of bytes to write to file
+ * 
+ * returns:     number of bytes written to file on success and -1 or error code on error
+ */
 int
 write(int fd, const_userptr_t buf, size_t nbytes, int *retval) 
 {
@@ -184,6 +222,17 @@ write(int fd, const_userptr_t buf, size_t nbytes, int *retval)
     return 0;
 }
 
+/*
+ * change current position in file
+ * -------------------------------
+ *
+ * fd:          file descriptor of file to read from
+ * pos:         buffer of data to write to file from
+ * whence:      max number of bytes to write to file
+ * 
+ * returns:     number of bytes written to file stored in retval and retval_v1 on success
+ *              returns -1 or error code on error
+ */
 int
 lseek(int fd, off_t pos, int whence, int *retval, int *retval_v1)
 {
