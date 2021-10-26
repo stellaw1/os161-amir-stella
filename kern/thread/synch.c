@@ -187,6 +187,7 @@ lock_acquire(struct lock *lock)
 
 	spinlock_acquire(&lock->lk_lock);
 	if (lock->lk_holder == curthread) {
+		spinlock_acquire(&lock->lk_lock);
 		return;
 	}
 	while (lock->lk_holder != NULL) {

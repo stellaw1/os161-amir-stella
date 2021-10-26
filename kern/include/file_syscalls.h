@@ -8,10 +8,10 @@
 /*
  * syscall functions
  */
-int open(const_userptr_t filename, int flags, mode_t mode);
+int open(const_userptr_t filename, int flags, mode_t mode, int *retval);
 int close(int fd);
-ssize_t read(int fd, userptr_t buf, size_t buflen);
-ssize_t write(int fd, const_userptr_t buf, size_t nbytes);
-off_t lseek(int fd, off_t pos, int whence);
+int read(int fd, userptr_t buf, size_t buflen, int *retval);
+int write(int fd, userptr_t buf, size_t nbytes, int *retval);
+int lseek(int fd, off_t pos, int whence, int *retval, int *retval_v1);
 
 #endif

@@ -118,7 +118,7 @@ syscall(struct trapframe *tf)
 		case SYS_open:
 		err = open((userptr_t)tf->tf_a0,
 				tf->tf_a1,
-                (mode_t)tf->tf_a2);
+                (mode_t)tf->tf_a2, &retval);
 		break;
 
 		case SYS_close:
@@ -126,11 +126,11 @@ syscall(struct trapframe *tf)
 		break;
 
 		case SYS_read:
-		err = read(tf->tf_a0, (userptr_t) tf->tf_a1, (size_t) tf->tf_a2);
+		err = read(tf->tf_a0, (userptr_t) tf->tf_a1, (size_t) tf->tf_a2, &retval);
 		break;
 
 		case SYS_write:
-		err = write(tf->tf_a0, (const_userptr_t) tf->tf_a1, (size_t) tf->tf_a2);
+		err = write(tf->tf_a0, (userptr_t) tf->tf_a1, (size_t) tf->tf_a2, &retval);
 		break;
 
 		case SYS_lseek: ;
@@ -147,9 +147,7 @@ syscall(struct trapframe *tf)
 			break;
 		}
 
-		off_t *ret = kmalloc(sizeof(off_t));
-
-		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, retval, retval_v1);
+		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, &retval, &retval_v1);
 		break;
 
 	    default:
