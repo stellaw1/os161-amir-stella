@@ -260,6 +260,10 @@ lseek(int fd, off_t pos, int whence, off_t *ret_pos)
     }
     lock_release(curproc->oft->table_lock);
 
+    if (!VOP_ISSEEKABLE(of->vn)) {
+		return ESPIPE;
+	}
+
     lock_acquire(of->flock);
     switch(whence) {
         case SEEK_SET:
