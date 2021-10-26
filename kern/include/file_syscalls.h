@@ -14,6 +14,6 @@ int read(int fd, userptr_t buf, size_t buflen, int *retval);
 int write(int fd, userptr_t buf, size_t nbytes, int *retval);
 int lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1);
 int chdir(const_userptr_t pathname);
-int __getcwd(userptr_t buf, size_t buflen);
+int __getcwd(userptr_t buf, size_t buflen, int *retval);
 
 #endif

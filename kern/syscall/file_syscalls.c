@@ -293,23 +293,15 @@ chdir(const_userptr_t pathname)
     if (kern_pathname == NULL) {
         return ENOSPC;
     }
-    size_t *path_len;
-    path_len = kmalloc(sizeof(size_t));
-    if (path_len == NULL) {
-        kfree(kern_pathname);
-        return ENOSPC;
-    }
 
-    result = copyinstr(pathname, kern_pathname, PATH_MAX, path_len);
+    result = copyinstr(pathname, kern_pathname, PATH_MAX, NULL);
     if (result) {
-        kfree(path_len);
         kfree(kern_pathname);
         return result;
     }
 
     result = vfs_chdir(kern_pathname);
 
-    kfree(path_len);
     kfree(kern_pathname);
     return result;
 }
@@ -324,7 +316,7 @@ chdir(const_userptr_t pathname)
  * returns:     length of data returned on success, -1 or error code on error
  */
 int
-__getcwd(userptr_t buf, size_t buflen)
+__getcwd(userptr_t buf, size_t buflen, int *retval)
 {
     int result;
     struct iovec *iov = kmalloc(sizeof(struct iovec));
@@ -333,5 +325,7 @@ __getcwd(userptr_t buf, size_t buflen)
     uio_uinit(iov, myuio, buf, buflen, 0, UIO_READ);
 
     result = vfs_getcwd(myuio);
+
+    *retval = myuio->uio_offset;
     return result;
 }
