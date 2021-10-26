@@ -146,25 +146,19 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
     lock_release(curproc->oft->table_lock);
     
     int result;
-    char kbuf[buflen];
     struct iovec *iov = kmalloc(sizeof(struct iovec));
     struct uio *myuio = kmalloc(sizeof(struct uio));
     
     lock_acquire(of->flock);
-    uio_kinit(iov, myuio, kbuf, buflen, of->offset, UIO_READ);
+    uio_uinit(iov, myuio, buf, buflen, of->offset, UIO_READ);
 
     result = VOP_READ(of->vn, myuio);
     if (result) {
         return result;
     }
 
-    result = copyout(iov->iov_kbase, (userptr_t) buf, buflen);
-    if (result) {
-        return result;
-    }
-
-    *retval = myuio->uio_offset;
-    of->offset += myuio->uio_offset;
+    *retval = myuio->uio_offset - of->offset;
+    of->offset = myuio->uio_offset;
     lock_release(of->flock);
 
     return 0;
@@ -181,7 +175,7 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
  * returns:     number of bytes written to file on success and -1 or error code on error
  */
 int
-write(int fd, const_userptr_t buf, size_t nbytes, int *retval) 
+write(int fd, userptr_t buf, size_t nbytes, int *retval) 
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -198,25 +192,19 @@ write(int fd, const_userptr_t buf, size_t nbytes, int *retval)
     lock_release(curproc->oft->table_lock);
 
     int result;
-    char kbuf[nbytes];
     struct iovec *iov = kmalloc(sizeof(struct iovec));
     struct uio *myuio = kmalloc(sizeof(struct uio));
 
     lock_acquire(of->flock);
-    uio_kinit(iov, myuio, kbuf, nbytes, of->offset, UIO_WRITE);
-
-    result = copyin((const_userptr_t) buf, iov->iov_kbase, nbytes);
-    if (result) {
-        return result;
-    }
+    uio_uinit(iov, myuio, buf, nbytes, of->offset, UIO_WRITE);
 
     result = VOP_WRITE(of->vn, myuio);
     if (result) {
         return result;
     }
     
-    *retval = myuio->uio_offset;
-    of->offset += myuio->uio_offset;
+    *retval = myuio->uio_offset - of->offset;
+    of->offset = myuio->uio_offset;
     lock_release(of->flock);
 
     return 0;
