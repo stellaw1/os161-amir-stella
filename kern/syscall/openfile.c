@@ -12,7 +12,8 @@
 /*
  * Generates a new open file entry
  *
- * returns:     pointer to newly generated open_file structure on success and NULL on error
+ * returns:     pointer to newly generated open_file structure on success and 
+ *              NULL on error
  */
 struct open_file *
 open_file_create(struct vnode *vn, int flag)

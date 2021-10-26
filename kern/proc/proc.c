@@ -222,7 +222,8 @@ proc_create_runprogram(const char *name)
 	spinlock_release(&curproc->p_lock);
 
 	/*
-	 * Generate open file table strucutre and instantiate speciaf fd 0, 1, 2 for new process
+	 * Generate open file table strucutre and instantiate special fd 0, 1, 2 
+	 * for new process
 	 */
 	int result;
 	newproc->oft = open_file_table_create();

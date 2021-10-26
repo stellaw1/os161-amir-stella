@@ -35,8 +35,6 @@
 int
 open(const_userptr_t filename, int flags, mode_t mode, int *retval) 
 {
-    //check flags
-    
     int result;
     char *kern_filename;
     kern_filename = kmalloc(PATH_MAX);
@@ -50,6 +48,7 @@ open(const_userptr_t filename, int flags, mode_t mode, int *retval)
         return ENOSPC;
     }
 
+    /* copy filename from userspace to kernel space for opening */
     result = copyinstr(filename, kern_filename, PATH_MAX, path_len);
     if (result) {
         kfree(path_len);
@@ -74,6 +73,7 @@ open(const_userptr_t filename, int flags, mode_t mode, int *retval)
         return ENOSPC;
     }
 
+    /* find the first empty entry in the open file table */
     lock_acquire(curproc->oft->table_lock);
     for (int i = 0; i < OPEN_MAX; i++) {
         if (curproc->oft->table[i] == NULL) {
@@ -105,6 +105,7 @@ open(const_userptr_t filename, int flags, mode_t mode, int *retval)
 int
 close(int fd)
 {
+    /* check if fd is a valid file descriptor */
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
     }
@@ -114,6 +115,10 @@ close(int fd)
         lock_release(curproc->oft->table_lock);
         return EBADF;
     }
+    /* 
+     * open_file_decref will decrement the refcount 
+     * and close the vnode if refcount == 0 
+     */
     open_file_decref(curproc->oft->table[fd]);
     curproc->oft->table[fd] = NULL;
     lock_release(curproc->oft->table_lock);
@@ -129,7 +134,8 @@ close(int fd)
  * buf:         buffer where read data will be stored
  * buflen:      maximum number of bytes that will be read from the file
  * 
- * returns:     number of bytes read from the file on success and -1 or error code on error
+ * returns:     number of bytes read from the file on success and -1 or error 
+ *              code on error
  */
 int
 read(int fd, userptr_t buf, size_t buflen, int *retval)
@@ -148,6 +154,7 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
         of = curproc->oft->table[fd];
     }
 
+    /* check if file permissions are not write only */
     if ((of->flag & O_WRONLY) != 0) {
         lock_release(curproc->oft->table_lock);
         return EBADF;
@@ -182,7 +189,8 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
  * buf:         buffer of data to write to file from
  * nbytes:      max number of bytes to write to file
  * 
- * returns:     number of bytes written to file on success and -1 or error code on error
+ * returns:     number of bytes written to file on success and -1 or error 
+ *              code on error
  */
 int
 write(int fd, userptr_t buf, size_t nbytes, int *retval) 
@@ -201,6 +209,7 @@ write(int fd, userptr_t buf, size_t nbytes, int *retval)
         of = curproc->oft->table[fd];
     }
     
+    /* check if file has write permissions */
     if ((of->flag & O_RDWR) == 0 && (of->flag & O_WRONLY) == 0) {
         lock_release(curproc->oft->table_lock);
         return EBADF;
@@ -235,7 +244,8 @@ write(int fd, userptr_t buf, size_t nbytes, int *retval)
  * pos:         buffer of data to write to file from
  * whence:      max number of bytes to write to file
  * 
- * returns:     number of bytes written to file stored in retval and retval_v1 on success
+ * returns:     number of bytes written to file stored in retval and 
+ *              retval_v1 on success
  *              returns -1 or error code on error
  */
 int
@@ -245,7 +255,8 @@ lseek(int fd, off_t pos, int whence, off_t *ret_pos)
         return EBADF;
     }
 
-    if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO) {
+    /* check to make sure we are not seeking on a device */
+    if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO) {    
         return ESPIPE;
     }
 
@@ -305,6 +316,7 @@ lseek(int fd, off_t pos, int whence, off_t *ret_pos)
 int
 dup2(int oldfd, int newfd, int *retval)
 {
+    /* check that both file descriptors are within the valid range */
     if (oldfd < 0 || oldfd >= OPEN_MAX || newfd < 0 || newfd >= OPEN_MAX) {
         return EBADF;
     }
