@@ -13,5 +13,6 @@ int close(int fd);
 int read(int fd, userptr_t buf, size_t buflen, int *retval);
 int write(int fd, userptr_t buf, size_t nbytes, int *retval);
 int lseek(int fd, off_t pos, int whence, int *retval, int *retval_v1);
+int dup2(int oldfd, int newfd, int *retval);
 
 #endif
