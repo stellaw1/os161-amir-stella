@@ -136,6 +136,8 @@ common_prog(int nargs, char **args)
 		proc_destroy(proc);
 		return result;
 	}
+	
+	while(1);
 
 	/*
 	 * The new process will be destroyed when the program exits...

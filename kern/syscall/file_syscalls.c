@@ -141,6 +141,7 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
 
     lock_acquire(curproc->oft->table_lock);
     if (curproc->oft->table[fd] == NULL) {
+        lock_release(curproc->oft->table_lock);
         return EBADF;
     } else {
         of = curproc->oft->table[fd];
@@ -156,6 +157,7 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
 
     result = VOP_READ(of->vn, myuio);
     if (result) {
+        lock_release(of->flock);
         return result;
     }
 
@@ -187,6 +189,7 @@ write(int fd, userptr_t buf, size_t nbytes, int *retval)
 
     lock_acquire(curproc->oft->table_lock);
     if (curproc->oft->table[fd] == NULL) {
+        lock_release(curproc->oft->table_lock);
         return EBADF;
     } else {
         of = curproc->oft->table[fd];
@@ -202,6 +205,7 @@ write(int fd, userptr_t buf, size_t nbytes, int *retval)
 
     result = VOP_WRITE(of->vn, myuio);
     if (result) {
+        lock_release(of->flock);
         return result;
     }
     
