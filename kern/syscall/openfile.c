@@ -6,6 +6,7 @@
 #include <kern/unistd.h>
 #include <kern/fcntl.h>
 #include <limits.h>
+#include <kern/errno.h>
 
 
 /*
@@ -16,9 +17,9 @@
 struct open_file *
 open_file_create(struct vnode *vn, int flag)
 {
-    // if (flag != O_RDONLY || flag != O_WRONLY || flag != O_RDWR) {
-    //     return NULL;
-    // }
+    if (flag != O_RDONLY && flag != O_WRONLY && flag != O_RDWR) {
+        return NULL;
+    }
     
     struct open_file *of;
     of = kmalloc(sizeof(struct open_file));
