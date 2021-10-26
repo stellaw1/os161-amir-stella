@@ -147,7 +147,15 @@ syscall(struct trapframe *tf)
 			break;
 		}
 
-		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, &retval, &retval_v1);
+		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, (uint32_t *) &retval, (uint32_t *) &retval_v1);
+		break;
+
+		case SYS_chdir: 
+		err = chdir((const_userptr_t) tf->tf_a0);
+		break;
+
+		case SYS___getcwd: 
+		err = __getcwd((userptr_t) tf->tf_a0, (size_t) tf->tf_a1, &retval);
 		break;
 
 	    default:

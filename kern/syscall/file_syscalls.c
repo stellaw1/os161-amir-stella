@@ -222,7 +222,7 @@ write(int fd, userptr_t buf, size_t nbytes, int *retval)
  *              returns -1 or error code on error
  */
 int
-lseek(int fd, off_t pos, int whence, int *retval, int *retval_v1)
+lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -265,7 +265,7 @@ lseek(int fd, off_t pos, int whence, int *retval, int *retval_v1)
             }
             of->offset = statbuf->st_size + pos;
             kfree(statbuf);
-            split64to32(of->offset, (uint32_t *)retval, (uint32_t *)retval_v1);
+            split64to32((uint64_t) of->offset, retval, retval_v1);
             break;
             
         default: 
@@ -275,4 +275,57 @@ lseek(int fd, off_t pos, int whence, int *retval, int *retval_v1)
     return 0;
 }
 
+/*
+ * changes current directory
+ * -------------------------
+ * 
+ * pathname:    directory to set current process to
+ * 
+ * returns:     0 on success, -1 on error
+ */
+int
+chdir(const_userptr_t pathname)
+{
+    int result;
 
+    char *kern_pathname;
+    kern_pathname = kmalloc(PATH_MAX);
+    if (kern_pathname == NULL) {
+        return ENOSPC;
+    }
+
+    result = copyinstr(pathname, kern_pathname, PATH_MAX, NULL);
+    if (result) {
+        kfree(kern_pathname);
+        return result;
+    }
+
+    result = vfs_chdir(kern_pathname);
+
+    kfree(kern_pathname);
+    return result;
+}
+
+/*
+ * get name of current working directory (backend)
+ * -----------------------------------------------
+ * 
+ * buf:         stores the current directory
+ * buflen:      length of data stored in buf
+ * 
+ * returns:     length of data returned on success, -1 or error code on error
+ */
+int
+__getcwd(userptr_t buf, size_t buflen, int *retval)
+{
+    int result;
+    struct iovec *iov = kmalloc(sizeof(struct iovec));
+    struct uio *myuio = kmalloc(sizeof(struct uio));
+    
+    uio_uinit(iov, myuio, buf, buflen, 0, UIO_READ);
+
+    result = vfs_getcwd(myuio);
+
+    *retval = myuio->uio_offset;
+    return result;
+}
