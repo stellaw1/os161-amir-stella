@@ -1,101 +1,81 @@
 // Question 1
-/* For e_ident[EI_MAG0..3] */
+In elf.h line 83
 #define	ELFMAG0		0x7f
-#define	ELFMAG1		'E'
-#define	ELFMAG2		'L'
-#define	ELFMAG3		'F'
-/*
- * Check to make sure it's a 32-bit ELF-version-1 executable
- * for our processor type. If it's not, we can't run it.
- *
- * Ignore EI_OSABI and EI_ABIVERSION - properly, we should
- * define our own, but that would require tinkering with the
- * linker to have it emit our magic numbers instead of the
- * default ones. (If the linker even supports these fields,
- * which were not in the original elf spec.)
- */
+#define	ELFMAG1		'E' (0x45)
+#define	ELFMAG2		'L' (0x4C)
+#define	ELFMAG3		'F' (0x46)
 
- Magic numbers are file type specific numbers that occur at the beginning of a
-file and identify the file type.
-0x7F 'E' 'L' 'F' (0x7F 0x45 0x4C 0x46)
+Magic numbers are file type specific numbers that occur at the beginning of a file and identify the file type. In loadelf.c it is used on line 192 to checkl it's a 32-bit ELF-version-1 executable for our processor type. 
+
 
 // Question 2
-loadelf.c ?
 UIO_USERISPACE corresponds to the memory space for user process instructions
-and UIO_USERSPACE corresponds to the memory space for user process data.
+UIO_USERSPACE corresponds to the memory space for user process data.
 UIO_SYSSPACE is used when accessing the memory space for the kernel.
 
+
 // Question 3
-uio.h
-vnode_check() in vnode.c
-result = VOP_READ(v, &u); is returned
-VOP_READ is emufs_read() in emu.c
-uio is passed in as an argument
-emu_read() is called and the result is returned
-which calls emu_doread()
-which calls emu_wreg() which writes
-uiomove() may be called repeatedly on the same uio to transfer
-additional data until the available buffer space the uio refers to
-is exhausted.
+because the uio is a structure that represents some memory block in user space at vaddr. Meaning, when vop_read is called, the uio is passed in and data is copied directly to the memory at address vaddr. 
+
 
 // Question 4
-runprogram.c
 When you write to a file the OS doesn’t actually write to the file right away. Instead it often buffers the data in memory and writes to it when it has time, or when another process isn’t writing to the disk. You can call flush() to flush the file to the disk.
 When a file is open the operating system has to keep track of it and this uses some resources. Closing the file releases the resources. On a large system running many process you can use up all of the resources to keep track of open files. This may prevent any process from opening another file. When the process ends or crashes the OS is supposed to clean up for you.
 If your program crashes or hangs before closing the file, the file may not be closed correctly. This can cause you to loose all or some of the data in the file.
 If another process wants to read a file, it may be prevented from reading an open file. This depends on how you open the file.
 
+
 // Question 5
-trapframe.h
-/*
- * Function to enter user mode. Does not return. The trapframe must
- * be on the thread's own stack or bad things will happen.
- */
-__DEAD void mips_usermode(struct trapframe *tf);
+mips_usermode() on line 368 in trap.c forces the processor to switch into usermode, and it is machine dependent. 
+
 
 // Question 6
-copyinout.c
-memmove.c
-b/c of setjump ?? context switch needed?? idk
+copyin and copyout are defined in copyinout.c
+memmove is deinfed in memmove.c
+because memmove is not implemented to cross between user address space and kernel address space. It can copy blocks of memory from user space to user space or kernel space to kernel space but cannot cross between the two, while copyin and copyout can handle transferring memory from user to kernel space and vice versa.
+
 
 // Question 7
-Define userptr_t as a pointer to a one-byte struct, so it won't mix
-with other pointers.
-typesafety to differentiate kernel pointers from user pointers
+userptr_t is just a pointer to a one-byte struct, but it specifically refers to pointers in user space so it can easily be differentiated from kernel pointers to ensure type safety. 
+
 
 // Question 8
-errno.h
+The numerical value of the exception code for a MIPS system call is ENOSYS which is 1, as defined in kern/errno.h
 #define ENOSYS          1      /* Function not implemented */
+
 
 // Question 9
 line 141 in syscall.c increments program counter by 4 which implies instructions are 4 bytes.
 
+
 // Question 10
-trap.c
 because currently the system just panics and dies without handling the fatal fault
 
+
 // Question 11
-First 4 arguments are on registers a0-a3
-any additional arguments would have to be fetched from the user level stack starting at sp+16 to skip over the slots for the registerized values with copyin()
+First 4 arguments are on registers a0-a3 in the trapframe. 
+Any additional arguments would have to be fetched from the user level stack starting at sp+16 to skip over the slots for the registerized values with copyin()
+
 
 // Question 12
-line 50 in syscalls.S
-Definition for each syscall.
- * All we do is load the syscall number into v0, the register the
- * kernel expects to find it in, and jump to the shared syscall code.
- * (Note that the addiu instruction is in the jump's delay slot.)
+line 49 in syscall.S
+It acts as a definition for each syscall, so that all we need to do is load the syscall number into v0 and jump to the shared syscall code to run system calls.
+
 
 // Question 13
-syscall on line 85 in syscalls.S ??
+syscall on line 84 in syscalls.S
+
 
 // Question 14
 arg0 is found in register a0, arg1 is found in registers a2/a3 and arg2 is found in the user-level stack starting at sp+16. arg2 is fetched from the user stack using copyin(sp+16). the 64-bit return value is returned using the resiters v0 and v1. register a3 is also set to 0 to indicate success or 1 to indicate failure
+
 
 // Question 15
 in runprogram(), vfs_open() is called to open the file
 in load_elf(), the macro VOP_READ is called to read the file
 similarily, VOP_WRITE is called to write to a file
 file descriptors are used to represent open files in the kernel
+
 
 // Question 16
 VOP_INCREF/ VOP_DECREF is used to increment/ decrement the counter in a vnode that is used to track the number of decriptors that are pointing to that file currently.
