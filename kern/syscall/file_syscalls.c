@@ -160,8 +160,10 @@ write(int fd, const_userptr_t buf, size_t nbytes)
     struct iovec *iov = kmalloc(sizeof(struct iovec));
     struct uio *myuio = kmalloc(sizeof(struct uio));
     uio_kinit(iov, myuio, kbuf, nbytes, of->offset, UIO_WRITE);
+    
+    size_t len = nbytes;
 
-    result = copyin((const_userptr_t) buf, iov->iov_kbase, nbytes);
+    result = copyinstr((const_userptr_t) buf, iov->iov_kbase, nbytes + 1, &len);
     if (result) {
         return result;
     }
