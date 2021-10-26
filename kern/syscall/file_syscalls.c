@@ -150,7 +150,7 @@ read(int fd, userptr_t buf, size_t buflen, int *retval)
 
     if ((of->flag & O_WRONLY) != 0) {
         lock_release(curproc->oft->table_lock);
-        return EACCES;
+        return EBADF;
     }
     lock_release(curproc->oft->table_lock);
     
@@ -203,7 +203,7 @@ write(int fd, userptr_t buf, size_t nbytes, int *retval)
     
     if ((of->flag & O_RDWR) == 0 && (of->flag & O_WRONLY) == 0) {
         lock_release(curproc->oft->table_lock);
-        return EACCES;
+        return EBADF;
     }
     lock_release(curproc->oft->table_lock);
 
