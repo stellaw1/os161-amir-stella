@@ -100,7 +100,7 @@ close(int fd)
     return 0;
 }
 
-ssize_t
+int
 read(int fd, userptr_t buf, size_t buflen)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
@@ -138,7 +138,7 @@ read(int fd, userptr_t buf, size_t buflen)
     return 0;
 }
 
-ssize_t 
+int
 write(int fd, const_userptr_t buf, size_t nbytes) 
 {
     if (fd < 0 || fd >= OPEN_MAX) {
@@ -178,7 +178,7 @@ write(int fd, const_userptr_t buf, size_t nbytes)
     return 0;
 }
 
-off_t
+int
 lseek(int fd, off_t pos, int whence, int *retval, int *retval_v1)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
