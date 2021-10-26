@@ -13,7 +13,7 @@ int close(int fd);
 int read(int fd, userptr_t buf, size_t buflen, int *retval);
 int write(int fd, userptr_t buf, size_t nbytes, int *retval);
 int dup2(int oldfd, int newfd, int *retval);
-int lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1);
+int lseek(int fd, off_t pos, int whence, off_t *ret_pos);
 int chdir(const_userptr_t pathname);
 int __getcwd(userptr_t buf, size_t buflen, int *retval);
 

@@ -84,7 +84,7 @@ void
 syscall(struct trapframe *tf)
 {
 	int callno;
-	int32_t retval, retval_v1;
+	int32_t retval;
 	int err;
 
 	KASSERT(curthread != NULL);
@@ -103,7 +103,6 @@ syscall(struct trapframe *tf)
 	 */
 
 	retval = 0;
-	retval_v1 = 0;
 
 	switch (callno) {
 	    case SYS_reboot:
@@ -148,7 +147,22 @@ syscall(struct trapframe *tf)
 			break;
 		}
 
-		err = lseek(tf->tf_a0, (off_t) *pos, whence, (uint32_t *) &retval, (uint32_t *) &retval_v1);
+		//64 bit return value variable
+		uint64_t *ret_pos = kmalloc(sizeof(off_t));
+		if (ret_pos == NULL) {
+			err = -1;
+			kfree(pos);
+			break;
+		}
+		
+		//perform lseek
+		err = lseek(tf->tf_a0, (off_t) *pos, whence, (off_t *) ret_pos);
+
+		//split 64 bit return value into 2 32 bit values to fit into registers v0 and v1
+    	split64to32(*ret_pos, &tf->tf_v0, &tf->tf_v1);
+		retval = tf->tf_v0;
+
+		kfree(ret_pos);
 		kfree(pos);
 		break;
 
@@ -183,9 +197,6 @@ syscall(struct trapframe *tf)
 	else {
 		/* Success. */
 		tf->tf_v0 = retval;
-		if (retval_v1) {
-			tf->tf_v1 = retval_v1;
-		}
 		tf->tf_a3 = 0;      /* signal no error */
 	}
 

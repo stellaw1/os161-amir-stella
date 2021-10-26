@@ -18,6 +18,8 @@
 #include <stat.h>
 #include <kern/fcntl.h>
 #include <endian.h>
+#include <kern/seek.h>
+#include <kern/unistd.h>
 
 /*
  * open a file
@@ -222,13 +224,13 @@ write(int fd, userptr_t buf, size_t nbytes, int *retval)
  *              returns -1 or error code on error
  */
 int
-lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
+lseek(int fd, off_t pos, int whence, off_t *ret_pos)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
     }
 
-    if (fd == 0 || fd == 1 || fd == 2) {
+    if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO) {
         return ESPIPE;
     }
 
@@ -242,35 +244,38 @@ lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
     }
     lock_release(curproc->oft->table_lock);
 
-    if (of->offset < pos) {
-        return EINVAL;
-    }
-
+    lock_acquire(of->flock);
     switch(whence) {
         case SEEK_SET:
             of->offset = pos;
-            split64to32(of->offset, (uint32_t *)retval, (uint32_t *)retval_v1);
             break;
 
         case SEEK_CUR:
-            of->offset = of->offset + pos;
-            split64to32(of->offset, (uint32_t *)retval, (uint32_t *)retval_v1);
+            of->offset += pos;
             break;
 
         case SEEK_END: ;
             struct stat *statbuf = kmalloc(sizeof(struct stat));
             int result = VOP_STAT(of->vn, statbuf);
             if (result) {
+                lock_release(of->flock);
+                kfree(statbuf);
                 return result;
             }
             of->offset = statbuf->st_size + pos;
             kfree(statbuf);
-            split64to32((uint64_t) of->offset, retval, retval_v1);
             break;
             
         default: 
             return EINVAL;
     }
+
+    if (of->offset < 0) {
+        return EINVAL;
+    }
+
+    *ret_pos = of->offset;
+    lock_release(of->flock);
 
     return 0;
 }
