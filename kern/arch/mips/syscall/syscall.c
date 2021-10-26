@@ -39,6 +39,7 @@
 #include <copyinout.h>
 #include <uio.h>
 #include <kern/iovec.h>
+#include <endian.h>
 
 
 /*
@@ -135,19 +136,20 @@ syscall(struct trapframe *tf)
 
 		case SYS_lseek: ;
 		//second argument off_t pos is 64 bits so exists in registers a2/a3
+		uint64_t *pos = kmalloc(sizeof(uint64_t));
+		join32to64(tf->tf_a2, tf->tf_a3, pos);
+
 		//third argument int whence exists on the user stack
 		const_userptr_t arg_addr = (const_userptr_t) tf->tf_sp + 16;
-		int *whence_buf = kmalloc(sizeof(int));
-		struct iovec *iov = kmalloc(sizeof(struct iovec));
-		struct uio *myuio = kmalloc(sizeof(struct uio));
-		uio_kinit(iov, myuio, whence_buf, 4, 0, UIO_WRITE);
+		int whence;
 		
-		err = copyin(arg_addr, iov->iov_kbase, 4);
+		err = copyin(arg_addr, &whence, 4);
 		if (err) {
 			break;
 		}
 
-		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, (uint32_t *) &retval, (uint32_t *) &retval_v1);
+		err = lseek(tf->tf_a0, (off_t) *pos, whence, (uint32_t *) &retval, (uint32_t *) &retval_v1);
+		kfree(pos);
 		break;
 
 		case SYS_chdir: 
