@@ -101,7 +101,7 @@ close(int fd)
 }
 
 int
-read(int fd, userptr_t buf, size_t buflen)
+read(int fd, userptr_t buf, size_t buflen, int *retval)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -121,11 +121,11 @@ read(int fd, userptr_t buf, size_t buflen)
     char kbuf[buflen];
     struct iovec *iov = kmalloc(sizeof(struct iovec));
     struct uio *myuio = kmalloc(sizeof(struct uio));
+    
+    lock_acquire(of->flock);
     uio_kinit(iov, myuio, kbuf, buflen, of->offset, UIO_READ);
 
-    lock_acquire(of->flock);
     result = VOP_READ(of->vn, myuio);
-    lock_release(of->flock);
     if (result) {
         return result;
     }
@@ -135,11 +135,15 @@ read(int fd, userptr_t buf, size_t buflen)
         return result;
     }
 
+    *retval = myuio->uio_offset;
+    of->offset += myuio->uio_offset;
+    lock_release(of->flock);
+
     return 0;
 }
 
 int
-write(int fd, const_userptr_t buf, size_t nbytes) 
+write(int fd, const_userptr_t buf, size_t nbytes, int *retval) 
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -159,21 +163,23 @@ write(int fd, const_userptr_t buf, size_t nbytes)
     char kbuf[nbytes];
     struct iovec *iov = kmalloc(sizeof(struct iovec));
     struct uio *myuio = kmalloc(sizeof(struct uio));
-    uio_kinit(iov, myuio, kbuf, nbytes, of->offset, UIO_WRITE);
-    
-    size_t len = nbytes;
-
-    result = copyinstr((const_userptr_t) buf, iov->iov_kbase, nbytes + 1, &len);
-    if (result) {
-        return result;
-    }
 
     lock_acquire(of->flock);
-    result = VOP_WRITE(of->vn, myuio);
-    lock_release(of->flock);
+    uio_kinit(iov, myuio, kbuf, nbytes, of->offset, UIO_WRITE);
+
+    result = copyin((const_userptr_t) buf, iov->iov_kbase, nbytes);
     if (result) {
         return result;
     }
+
+    result = VOP_WRITE(of->vn, myuio);
+    if (result) {
+        return result;
+    }
+    
+    *retval = myuio->uio_offset;
+    of->offset += myuio->uio_offset;
+    lock_release(of->flock);
 
     return 0;
 }
