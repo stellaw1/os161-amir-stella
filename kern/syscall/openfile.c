@@ -17,10 +17,6 @@
 struct open_file *
 open_file_create(struct vnode *vn, int flag)
 {
-    if (flag != O_RDONLY && flag != O_WRONLY && flag != O_RDWR) {
-        return NULL;
-    }
-    
     struct open_file *of;
     of = kmalloc(sizeof(struct open_file));
     if (of == NULL) {
