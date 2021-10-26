@@ -30,7 +30,7 @@
  * returns:     a nonnegative file handle on success and -1 or errno on error
  */
 int
-open(const_userptr_t filename, int flags, mode_t mode) 
+open(const_userptr_t filename, int flags, mode_t mode, int *retval) 
 {
     //check flags
     
@@ -78,6 +78,7 @@ open(const_userptr_t filename, int flags, mode_t mode)
             kfree(kern_filename);
             kfree(path_len);
             lock_release(curproc->oft->table_lock);
+            *retval = i;
             return 0;
         }
     }
@@ -101,17 +102,16 @@ open(const_userptr_t filename, int flags, mode_t mode)
 int
 close(int fd)
 {
-    if (fd < 0 || fd >= OPEN_MAX || curproc->oft->table[fd] == NULL) {
+    if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
     }
 
     lock_acquire(curproc->oft->table_lock);
-    vfs_close(curproc->oft->table[fd]->vn);
-    curproc->oft->table[fd]->refcount--;
-
-    if (curproc->oft->table[fd]->refcount == 0) {
-        open_file_destroy(curproc->oft->table[fd]);
+    if (curproc->oft->table[fd] == NULL) {
+        lock_release(curproc->oft->table_lock);
+        return EBADF;
     }
+    open_file_decref(curproc->oft->table[fd]);
     curproc->oft->table[fd] = NULL;
     lock_release(curproc->oft->table_lock);
 
@@ -128,8 +128,8 @@ close(int fd)
  * 
  * returns:     number of bytes read from the file on success and -1 or error code on error
  */
-ssize_t
-read(int fd, userptr_t buf, size_t buflen)
+int
+read(int fd, userptr_t buf, size_t buflen, int *retval)
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -146,22 +146,20 @@ read(int fd, userptr_t buf, size_t buflen)
     lock_release(curproc->oft->table_lock);
     
     int result;
-    char kbuf[buflen];
     struct iovec *iov = kmalloc(sizeof(struct iovec));
     struct uio *myuio = kmalloc(sizeof(struct uio));
-    uio_kinit(iov, myuio, kbuf, buflen, of->offset, UIO_READ);
-
+    
     lock_acquire(of->flock);
+    uio_uinit(iov, myuio, buf, buflen, of->offset, UIO_READ);
+
     result = VOP_READ(of->vn, myuio);
-    lock_release(of->flock);
     if (result) {
         return result;
     }
 
-    result = copyout(iov->iov_kbase, (userptr_t) buf, buflen);
-    if (result) {
-        return result;
-    }
+    *retval = myuio->uio_offset - of->offset;
+    of->offset = myuio->uio_offset;
+    lock_release(of->flock);
 
     return 0;
 }
@@ -176,8 +174,8 @@ read(int fd, userptr_t buf, size_t buflen)
  * 
  * returns:     number of bytes written to file on success and -1 or error code on error
  */
-ssize_t 
-write(int fd, const_userptr_t buf, size_t nbytes) 
+int
+write(int fd, userptr_t buf, size_t nbytes, int *retval) 
 {
     if (fd < 0 || fd >= OPEN_MAX) {
         return EBADF;
@@ -194,22 +192,20 @@ write(int fd, const_userptr_t buf, size_t nbytes)
     lock_release(curproc->oft->table_lock);
 
     int result;
-    char kbuf[nbytes];
     struct iovec *iov = kmalloc(sizeof(struct iovec));
     struct uio *myuio = kmalloc(sizeof(struct uio));
-    uio_kinit(iov, myuio, kbuf, nbytes, of->offset, UIO_WRITE);
-
-    result = copyin((const_userptr_t) buf, iov->iov_kbase, nbytes);
-    if (result) {
-        return result;
-    }
 
     lock_acquire(of->flock);
+    uio_uinit(iov, myuio, buf, nbytes, of->offset, UIO_WRITE);
+
     result = VOP_WRITE(of->vn, myuio);
-    lock_release(of->flock);
     if (result) {
         return result;
     }
+    
+    *retval = myuio->uio_offset - of->offset;
+    of->offset = myuio->uio_offset;
+    lock_release(of->flock);
 
     return 0;
 }
@@ -253,12 +249,12 @@ lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
     switch(whence) {
         case SEEK_SET:
             of->offset = pos;
-            split64to32(of->offset, retval, retval_v1);
+            split64to32(of->offset, (uint32_t *)retval, (uint32_t *)retval_v1);
             break;
 
         case SEEK_CUR:
             of->offset = of->offset + pos;
-            split64to32(of->offset, retval, retval_v1);
+            split64to32(of->offset, (uint32_t *)retval, (uint32_t *)retval_v1);
             break;
 
         case SEEK_END: ;
