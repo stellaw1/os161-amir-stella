@@ -83,7 +83,7 @@ void
 syscall(struct trapframe *tf)
 {
 	int callno;
-	uint32_t retval, retval_v1;
+	int32_t retval, retval_v1;
 	int err;
 
 	KASSERT(curthread != NULL);
@@ -147,7 +147,7 @@ syscall(struct trapframe *tf)
 			break;
 		}
 
-		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, &retval, &retval_v1);
+		err = lseek(tf->tf_a0, (off_t) tf->tf_a2, *whence_buf, (uint32_t *) &retval, (uint32_t *) &retval_v1);
 		break;
 
 		case SYS_chdir: 

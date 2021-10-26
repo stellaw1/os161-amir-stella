@@ -327,20 +327,11 @@ int
 __getcwd(userptr_t buf, size_t buflen)
 {
     int result;
-    char kbuf[buflen];
     struct iovec *iov = kmalloc(sizeof(struct iovec));
     struct uio *myuio = kmalloc(sizeof(struct uio));
-    uio_kinit(iov, myuio, kbuf, buflen, of->offset, UIO_READ);
+    
+    uio_uinit(iov, myuio, buf, buflen, 0, UIO_READ);
 
     result = vfs_getcwd(myuio);
-    if (result) {
-        return result;
-    }
-
-    result = copyout(iov->iov_kbase, buf, buflen);
-    if (result) {
-        return result;
-    }
-
-    return 0;
+    return result;
 }
