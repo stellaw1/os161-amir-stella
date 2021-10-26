@@ -275,6 +275,28 @@ lseek(int fd, off_t pos, int whence, uint32_t *retval, uint32_t *retval_v1)
     return 0;
 }
 
+int
+dup2(int oldfd, int newfd, int *retval)
+{
+    if (oldfd < 0 || oldfd >= OPEN_MAX || newfd < 0 || newfd >= OPEN_MAX) {
+        return EBADF;
+    }
+
+    lock_acquire(curproc->oft->table_lock);
+    if (curproc->oft->table[oldfd] == NULL) {
+        lock_release(curproc->oft->table_lock);
+        return EBADF;
+    }
+    if (curproc->oft->table[newfd] != NULL) {
+        open_file_decref(curproc->oft->table[newfd]);
+    }
+    curproc->oft->table[newfd] = curproc->oft->table[oldfd];
+    open_file_incref(curproc->oft->table[oldfd]);
+    lock_release(curproc->oft->table_lock);
+
+    *retval = newfd;
+    return 0;
+}
 /*
  * changes current directory
  * -------------------------
