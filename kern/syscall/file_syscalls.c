@@ -11,6 +11,7 @@
 #include <proc.h>
 #include <vfs.h>
 #include <openfiletable.h>
+#include <openfile.h>
 #include <limits.h>
 #include <copyinout.h>
 #include <uio.h>
@@ -252,6 +253,7 @@ lseek(int fd, off_t pos, int whence, off_t *ret_pos)
 
     lock_acquire(curproc->oft->table_lock);
     if (curproc->oft->table[fd] == NULL) {
+        lock_release(curproc->oft->table_lock);
         return EBADF;
     } else {
         of = curproc->oft->table[fd];
@@ -281,10 +283,12 @@ lseek(int fd, off_t pos, int whence, off_t *ret_pos)
             break;
             
         default: 
+            lock_release(of->flock);
             return EINVAL;
     }
 
     if (of->offset < 0) {
+        lock_release(of->flock);
         return EINVAL;
     }
 
