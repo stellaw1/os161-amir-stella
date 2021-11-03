@@ -40,17 +40,48 @@ fork(struct trapframe tf, int *retval)
 
     // create new process w same name as current process
     struct proc *child;
-    child = proc_create_runprogram(curproc->p_name);
+    child = proc_create_runprogram("childproc");
+    if (child === NULL) {
+        return -1;
+    }
 
     // copy stack
     child->p_addrspace = as_create();
+    if (child->p_addrspace === NULL) {
+        return -1;
+    }
     result = as_copy(curproc->p_addrspace, &child->p_addrspace);
     if (result) {
         return result;
     }
 
-    // init child thread open file table
-    child->oft = 
+    // copy open file table
+    result = open_file_table_copy(proc->oft, child->oft);
+    if (result) {
+        return result;
+    }
+
+    // make the new child process return to user mode with a return value of 0
+    struct trapframe *child_tf = kmalloc(sizeof(struct trapframe));
+    if (child_tf == NULL) {
+        return -1;
+    };
+    *child_tf = tf;
+    vaddr_t stackptr, entrypoint;
+    result = as_define_stack(as, &stackptr);
+	if (result) {
+		/* p_addrspace will go away when curproc is destroyed */
+		return result;
+	}
+
+    //warp to usermode TODO probs need to call this in syscall.c actually else parent thread never returns ?
+    enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+			  NULL /*userspace addr of environment*/,
+			  stackptr, entrypoint);
+
+    // TODO return pid of child process
+    // pid_t child_pid;
+    // *retval = child_pid;
 }
 
 /*

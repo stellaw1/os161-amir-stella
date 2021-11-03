@@ -90,7 +90,7 @@ special_fd_create(struct open_file_table *oft)
 }
 
 /*
- * Generates and cleans up open file table
+ * Cleans up open file table
  */
 void
 open_file_table_destroy(struct open_file_table *oft) {
@@ -105,4 +105,26 @@ open_file_table_destroy(struct open_file_table *oft) {
             oft->table[fd] = NULL;
         }
     }
+}
+
+/*
+ * Copies non special fd's from old_oft to new_oft
+ */
+void
+open_file_table_copy(struct open_file_table *old_oft, struct open_file_table *new_oft) {
+    if (old_oft == NULL || new_oft == NULL) {
+        return -1;
+    }
+
+    for (int fd = 3; fd < OPEN_MAX; fd++) {
+        if (old_oft->table[fd] != NULL) {
+
+            //assign any non NULL fd pointers to new_oft at the same index
+            new_oft->table[fd] = old_oft->table[fd];
+
+            // increase refcount of open file entry by 1
+            open_file_incref(old_oft->table[fd]);
+        }
+    }
+    return 0;
 }

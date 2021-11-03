@@ -32,5 +32,9 @@ void open_file_table_destroy(struct open_file_table *oft);
  */
 int special_fd_create(struct open_file_table *oft);
 
+/*
+ * copy contents of old_oft to new_oft
+ */
+void open_file_table_copy(struct open_file_table *old_oft, struct open_file_table *new_oft);
 
 #endif /* _OPENFILETABLE_H_ */
