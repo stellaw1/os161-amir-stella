@@ -36,6 +36,7 @@
 #include <current.h>
 #include <syscall.h>
 #include <file_syscalls.h>
+#include <proc_syscalls.h>
 #include <copyinout.h>
 #include <uio.h>
 #include <kern/iovec.h>
@@ -245,4 +246,7 @@ void
 enter_forked_process(struct trapframe *tf)
 {
 	(void)tf;
+	
+    mips_usermode(tf);
+	// enter_new_process()
 }

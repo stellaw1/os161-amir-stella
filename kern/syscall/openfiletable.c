@@ -110,7 +110,7 @@ open_file_table_destroy(struct open_file_table *oft) {
 /*
  * Copies non special fd's from old_oft to new_oft
  */
-void
+int
 open_file_table_copy(struct open_file_table *old_oft, struct open_file_table *new_oft) {
     if (old_oft == NULL || new_oft == NULL) {
         return -1;

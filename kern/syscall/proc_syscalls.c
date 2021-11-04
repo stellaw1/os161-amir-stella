@@ -7,7 +7,7 @@
 #include <current.h>
 #include <syscall.h>
 #include <synch.h>
-#include <file_syscalls.h>
+#include <proc_syscalls.h>
 #include <proc.h>
 #include <vfs.h>
 #include <openfiletable.h>
@@ -21,8 +21,17 @@
 #include <endian.h>
 #include <kern/seek.h>
 #include <kern/unistd.h>
-#include <trapframe.h>
-#include <dumbvm.c>
+#include <addrspace.h>
+
+/*
+ * Support functions.
+ */
+static
+void help_enter_forked_process(void *ptr, unsigned long nargs) 
+{
+    (void) nargs;
+    enter_forked_process((struct trapframe *) ptr);
+}
 
 /*
  * copy the current process
@@ -34,20 +43,21 @@
  *              returns 0 in the child process
  */
 int
-fork(struct trapframe tf, int *retval) 
+fork(struct trapframe *tf, int *retval) 
 {
     int result;
+
 
     // create new process w same name as current process
     struct proc *child;
     child = proc_create_runprogram("childproc");
-    if (child === NULL) {
+    if (child == NULL) {
         return -1;
     }
 
     // copy stack
     child->p_addrspace = as_create();
-    if (child->p_addrspace === NULL) {
+    if (child->p_addrspace == NULL) {
         return -1;
     }
     result = as_copy(curproc->p_addrspace, &child->p_addrspace);
@@ -56,7 +66,7 @@ fork(struct trapframe tf, int *retval)
     }
 
     // copy open file table
-    result = open_file_table_copy(proc->oft, child->oft);
+    result = open_file_table_copy(curproc->oft, child->oft);
     if (result) {
         return result;
     }
@@ -66,72 +76,78 @@ fork(struct trapframe tf, int *retval)
     if (child_tf == NULL) {
         return -1;
     };
-    *child_tf = tf;
-    vaddr_t stackptr, entrypoint;
-    result = as_define_stack(as, &stackptr);
-	if (result) {
-		/* p_addrspace will go away when curproc is destroyed */
-		return result;
-	}
+    //copy parent trapframe content
+    memcpy(child_tf, tf, sizeof(struct trapframe));
 
-    //warp to usermode TODO probs need to call this in syscall.c actually else parent thread never returns ?
-    enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
-			  NULL /*userspace addr of environment*/,
-			  stackptr, entrypoint);
+    // set return value register for child proc
+    child_tf->tf_v0 = 0;
+
+    result = thread_fork("child proc", 
+                        child, 
+                        help_enter_forked_process, 
+                        &child_tf, 
+                        0);
+    if (result) {
+        return -1;
+    }
+
 
     // TODO return pid of child process
     // pid_t child_pid;
     // *retval = child_pid;
+    (void) retval;
+
+    return 0;
 }
 
-/*
- * execute a program
- * ------------
- *
- * program:     path name of program to replace current program with
- * args:        array of 0 terminated strings; array terminated by NULL pointer
- * 
- * returns:     returns the process id of the new child process in the parent process; 
- *              returns 0 in the child process
- */
-int execv(const char *program, char **args)
-{
+// /*
+//  * execute a program
+//  * ------------
+//  *
+//  * program:     path name of program to replace current program with
+//  * args:        array of 0 terminated strings; array terminated by NULL pointer
+//  * 
+//  * returns:     returns the process id of the new child process in the parent process; 
+//  *              returns 0 in the child process
+//  */
+// int execv(const char *program, char **args)
+// {
 
-}
+// }
 
-/*
- * wait for a process to exit
- * ------------
- *
- * pid:         specifies process to wait on 
- * status:      points to encoded exit status integer
- * options:     0
- * 
- * returns:     returns pid on success and -1 or error code on error
- */
-int waitpid(int pid, userptr_t status, int options, int *retval)
-{
+// /*
+//  * wait for a process to exit
+//  * ------------
+//  *
+//  * pid:         specifies process to wait on 
+//  * status:      points to encoded exit status integer
+//  * options:     0
+//  * 
+//  * returns:     returns pid on success and -1 or error code on error
+//  */
+// int waitpid(int pid, userptr_t status, int options, int *retval)
+// {
 
-}
+// }
 
-/*
- * terminate current process
- * ------------
- *
- * exitcode:    7 bit wide value that is reported to other processes bia waitpid()
- */
-int _exit(int exitcode)
-{
+// /*
+//  * terminate current process
+//  * ------------
+//  *
+//  * exitcode:    7 bit wide value that is reported to other processes bia waitpid()
+//  */
+// int _exit(int exitcode)
+// {
 
-}
+// }
 
-/*
- * get process id
- * ------------
- * 
- * returns:     the process id of the current process
- */
-int getpid(int *retval)
-{
+// /*
+//  * get process id
+//  * ------------
+//  * 
+//  * returns:     the process id of the current process
+//  */
+// int getpid(int *retval)
+// {
 
-}
+// }
