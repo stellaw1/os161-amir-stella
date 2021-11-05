@@ -245,8 +245,14 @@ syscall(struct trapframe *tf)
 void
 enter_forked_process(struct trapframe *tf)
 {
-	(void)tf;
-	
-    mips_usermode(tf);
-	// enter_new_process()
+	struct trapframe child_tf;
+
+    //copy parent trapframe content
+    memcpy(&child_tf, tf, sizeof(struct trapframe));
+
+	// set return value register for child proc
+    child_tf.tf_v0 = 0;
+	child_tf.tf_epc += 4;
+
+    mips_usermode(&child_tf);
 }

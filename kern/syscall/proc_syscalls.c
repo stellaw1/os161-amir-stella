@@ -72,20 +72,14 @@ fork(struct trapframe *tf, int *retval)
     }
 
     // make the new child process return to user mode with a return value of 0
-    struct trapframe *child_tf = kmalloc(sizeof(struct trapframe));
-    if (child_tf == NULL) {
-        return -1;
-    };
-    //copy parent trapframe content
-    memcpy(child_tf, tf, sizeof(struct trapframe));
+    
 
-    // set return value register for child proc
-    child_tf->tf_v0 = 0;
+    
 
     result = thread_fork("child proc", 
                         child, 
                         help_enter_forked_process, 
-                        &child_tf, 
+                        tf, 
                         0);
     if (result) {
         return -1;
