@@ -379,6 +379,7 @@ file      syscall/time_syscalls.c
 file      syscall/file_syscalls.c
 file      syscall/openfiletable.c
 file      syscall/openfile.c
+file      syscall/pidtable.c
 
 #
 # Startup and initialization
