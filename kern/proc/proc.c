@@ -50,11 +50,19 @@
 #include <vnode.h>
 #include <openfiletable.h>
 #include <openfile.h>
+#include <synch.h>
+#include <limits.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
+
+/*
+ * Global variables
+ */
+struct proc *pid_table[PID_MAX];
+struct lock *pid_table_lock;
 
 /*
  * Create a proc structure.
@@ -171,7 +179,7 @@ proc_destroy(struct proc *proc)
 	spinlock_cleanup(&proc->p_lock);
 
 	kfree(proc->p_name);
-	
+
 	open_file_table_destroy(proc->oft);
 }
 
@@ -184,6 +192,11 @@ proc_bootstrap(void)
 	kproc = proc_create("[kernel]");
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");
+	}
+
+	pid_table_lock = lock_create("pid_table_lock");
+	if (pid_table_lock == NULL) {
+		panic("failed to create pid table lock\n");
 	}
 }
 
@@ -222,7 +235,7 @@ proc_create_runprogram(const char *name)
 	spinlock_release(&curproc->p_lock);
 
 	/*
-	 * Generate open file table strucutre and instantiate special fd 0, 1, 2 
+	 * Generate open file table strucutre and instantiate special fd 0, 1, 2
 	 * for new process
 	 */
 	int result;
