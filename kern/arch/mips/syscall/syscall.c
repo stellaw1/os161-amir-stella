@@ -36,6 +36,7 @@
 #include <current.h>
 #include <syscall.h>
 #include <file_syscalls.h>
+#include <proc_syscalls.h>
 #include <copyinout.h>
 #include <uio.h>
 #include <kern/iovec.h>
@@ -178,6 +179,26 @@ syscall(struct trapframe *tf)
 		err = dup2(tf->tf_a0, tf->tf_a1, &retval);
 		break;
 
+		case SYS_fork:
+		err = fork(tf, &retval);
+		break;
+		
+		// case SYS_execv:
+		// err = sys_execv((const char *) tf->tf_a0, (char **) tf->tf_a1);
+		// break;
+
+		// case SYS_waitpid:
+		// err = sys_waitpid(tf->tf_a0, (userptr_t) tf->tf_a1, tf->tf_a2, &retval);
+		// break;
+
+		// case SYS__exit:
+		// err = sys_exit(tf->tf_a0);
+		// break;
+
+		// case SYS_getpid:
+		// err = sys_getpid(&retval);
+		// break;
+
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;
@@ -224,5 +245,14 @@ syscall(struct trapframe *tf)
 void
 enter_forked_process(struct trapframe *tf)
 {
-	(void)tf;
+	struct trapframe child_tf;
+
+    //copy parent trapframe content
+    memcpy(&child_tf, tf, sizeof(struct trapframe));
+
+	// set return value register for child proc
+    child_tf.tf_v0 = 0;
+	child_tf.tf_epc += 4;
+
+    mips_usermode(&child_tf);
 }
