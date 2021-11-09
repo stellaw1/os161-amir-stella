@@ -64,6 +64,7 @@ struct proc {
 	struct open_file_table *oft;
 
 	int pid;
+	int children_pids[PID_MAX];
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */

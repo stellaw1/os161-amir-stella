@@ -27,7 +27,7 @@
  * Support functions.
  */
 static
-void help_enter_forked_process(void *ptr, unsigned long nargs) 
+void help_enter_forked_process(void *ptr, unsigned long nargs)
 {
     (void) nargs;
     enter_forked_process((struct trapframe *) ptr);
@@ -38,12 +38,12 @@ void help_enter_forked_process(void *ptr, unsigned long nargs)
  * ------------
  *
  * tf:          trapframe of parent process
- * 
- * returns:     returns the process id of the new child process in the parent process; 
+ *
+ * returns:     returns the process id of the new child process in the parent process;
  *              returns 0 in the child process
  */
 int
-fork(struct trapframe *tf, int *retval) 
+fork(struct trapframe *tf, int *retval)
 {
     int result;
 
@@ -52,44 +52,47 @@ fork(struct trapframe *tf, int *retval)
     struct proc *child;
     child = proc_create_runprogram("childproc");
     if (child == NULL) {
-        return -1;
+        return ENPROC;
     }
+
+    // TODO add child pid to array
+
+    spinlock_acquire(&curproc->p_lock);
 
     // copy stack
     child->p_addrspace = as_create();
     if (child->p_addrspace == NULL) {
+
+    spinlock_release(&curproc->p_lock);
         return -1;
     }
     result = as_copy(curproc->p_addrspace, &child->p_addrspace);
     if (result) {
+        spinlock_release(&curproc->p_lock);
         return result;
     }
 
+    // TODO lock oft
     // copy open file table
     result = open_file_table_copy(curproc->oft, child->oft);
     if (result) {
+        spinlock_release(&curproc->p_lock);
         return result;
     }
 
-    // make the new child process return to user mode with a return value of 0
-    
+    spinlock_release(&curproc->p_lock);
 
-    
-
-    result = thread_fork("child proc", 
-                        child, 
-                        help_enter_forked_process, 
-                        tf, 
+    result = thread_fork("child proc",
+                        child,
+                        help_enter_forked_process,
+                        tf,
                         0);
     if (result) {
         return -1;
     }
 
-
-    // TODO return pid of child process
-    // pid_t child_pid;
-    // *retval = child_pid;
-    (void) retval;
+    // return pid of child process
+    *retval = child->pid;
 
     return 0;
 }
@@ -100,8 +103,8 @@ fork(struct trapframe *tf, int *retval)
 //  *
 //  * program:     path name of program to replace current program with
 //  * args:        array of 0 terminated strings; array terminated by NULL pointer
-//  * 
-//  * returns:     returns the process id of the new child process in the parent process; 
+//  *
+//  * returns:     returns the process id of the new child process in the parent process;
 //  *              returns 0 in the child process
 //  */
 // int execv(const char *program, char **args)
@@ -113,10 +116,10 @@ fork(struct trapframe *tf, int *retval)
 //  * wait for a process to exit
 //  * ------------
 //  *
-//  * pid:         specifies process to wait on 
+//  * pid:         specifies process to wait on
 //  * status:      points to encoded exit status integer
 //  * options:     0
-//  * 
+//  *
 //  * returns:     returns pid on success and -1 or error code on error
 //  */
 // int waitpid(int pid, userptr_t status, int options, int *retval)
@@ -135,13 +138,18 @@ fork(struct trapframe *tf, int *retval)
 
 // }
 
-// /*
-//  * get process id
-//  * ------------
-//  * 
-//  * returns:     the process id of the current process
-//  */
-// int getpid(int *retval)
-// {
+/*
+ * get process id
+ * ------------
+ *
+ * returns:     the process id of the current process
+ */
+int getpid(int *retval)
+{
+    KASSERT(curproc->pid != 0);
+    KASSERT(curproc->pid != 1);
 
-// }
+    *retval = curproc->pid;
+
+    return 0;
+}
