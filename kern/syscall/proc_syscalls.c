@@ -135,13 +135,14 @@ fork(struct trapframe *tf, int *retval)
 
 // }
 
-// /*
-//  * get process id
-//  * ------------
-//  * 
-//  * returns:     the process id of the current process
-//  */
-// int getpid(int *retval)
-// {
-
-// }
+/*
+ * get process id
+ * ------------
+ * 
+ * returns:     the process id of the current process
+ */
+int getpid(int *retval)
+{
+    *retval = curproc->pid;
+    return 0;
+}
