@@ -94,20 +94,113 @@ fork(struct trapframe *tf, int *retval)
     return 0;
 }
 
-// /*
-//  * execute a program
-//  * ------------
-//  *
-//  * program:     path name of program to replace current program with
-//  * args:        array of 0 terminated strings; array terminated by NULL pointer
-//  * 
-//  * returns:     returns the process id of the new child process in the parent process; 
-//  *              returns 0 in the child process
-//  */
-// int execv(const char *program, char **args)
-// {
+void
+kfree_buf(char **buf) {
+    for (int j = 0; j < i; j++) {
+        kfree(buf[j]);
+    }
+    kfree(buf);
+}
 
-// }
+void
+kfree_newas(struct addrspace *oldas, struct addrspace *newas) {
+    proc_setas(oldas);
+    as_activate();
+    proc_destroy(newas);
+}
+
+/*
+ * execute a program
+ * ------------
+ *
+ * program:     path name of program to replace current program with
+ * args:        array of 0 terminated strings; array terminated by NULL pointer
+ * 
+ * returns:     returns the process id of the new child process in the parent process; 
+ *              returns 0 in the child process
+ */
+int execv(const char *program, char **args)
+{
+    int argc;
+    int err = 0;
+    for (argc = 0; args[argc] != NULL; argc++);
+    if (argc >= ARG_MAX) {
+        return E2BIG;
+    }
+    char **argsbuf = kmalloc(sizeof(char*) * argc);
+    if (argsbuf == NULL) {
+        return ENOMEM;
+    }
+
+    for (int i = 0; i < argc; i++) {
+        argsbuf[i] = kmalloc(strlen(args[i]));
+        if (argsbuf[i] == NULL) {
+            kfree_buf(argsbuf);
+            return ENOMEM;
+        }
+        err = copyin(args[i], argsbuf[i], strlen(args[i]));
+        if (err) {
+            kfree_buf(argsbuf);
+            return err;
+        }
+    }
+
+    char *progname = kmalloc(strlen(program));
+    if (progname == NULL) {
+        kfree_buf(argsbuf);
+        return ENOMEM;
+    }
+    err = copyin(program, progname, strlen(program));
+    if (err) {
+        kfree_buf(argsbuf);
+        kfree(progname);
+        return err;
+    }
+
+    struct *vnode prog_vn;
+    err = vfs_open(progname, O_RDONLY, 0, &prog_vn);
+    if (err) {
+        kfree_buf(argsbuf);
+        kfree(progname);
+        return err;
+    }
+
+    struct addrspace *newas = as_create();
+    if (newas == NULL) {
+        kfree_buf(argsbuf);
+        kfree(progname);
+        return ENOMEM;
+    }
+
+    struct addrspace *oldas = proc_setas(newas);
+    as_activate();
+
+    vaddr_t entrypoint;
+
+    err = load_elf(prog_vn, &entrypoint);
+    if (err) {
+        kfree_buf(argsbuf);
+        kfree(progname);
+        kfree_newas(oldas, newas);
+        return err;
+    }
+
+    vaddr_t stackptr;
+    err = as_define_stack(newas, &stackptr);
+    if (err) {
+        kfree_buf(argsbuf);
+        kfree(progname);
+        kfree_newas(oldas, newas);
+        return err;
+    }
+
+    // TODO: copy arguments to new address space
+
+    as_destroy(oldas);
+
+    userptr_t argv, env;
+    enter_new_process(argc, argv, env, stackptr, entrypoint);
+}
 
 // /*
 //  * wait for a process to exit
