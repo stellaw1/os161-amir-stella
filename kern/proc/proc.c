@@ -53,6 +53,7 @@
 #include <synch.h>
 #include <limits.h>
 #include <kern/errno.h>
+#include <pid.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -62,7 +63,7 @@ struct proc *kproc;
 /*
  * Global variables
  */
-struct proc *pid_table[PID_MAX];
+struct pid *pid_table[PID_MAX];
 struct lock *pid_table_lock;
 
 /*
@@ -253,8 +254,13 @@ proc_create_runprogram(const char *name)
 	lock_acquire(pid_table_lock);
 	for (int i = PID_MIN; i < PID_MAX; i++) {
 		if (pid_table[i] == NULL) {
+			pid_table[i] = kmalloc(sizeof(struct pid));
+			if (pid_table[i] == NULL) {
+				return NULL;
+			}
+			pid_table[i]->status = true;
+
 			newproc->pid = i;
-			// pid_table[i] = newproc;
 			break;
 		} else if (i == PID_MAX - 1) {
 			return NULL;
