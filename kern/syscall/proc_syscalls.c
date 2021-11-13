@@ -57,35 +57,35 @@ fork(struct trapframe *tf, int *retval)
 
     // TODO add child pid to array
 
-    spinlock_acquire(&curproc->p_lock);
-
     // copy stack
-    child->p_addrspace = as_create();
-    if (child->p_addrspace == NULL) {
-
-    spinlock_release(&curproc->p_lock);
-        return -1;
-    }
     result = as_copy(curproc->p_addrspace, &child->p_addrspace);
     if (result) {
-        spinlock_release(&curproc->p_lock);
         return result;
     }
 
     // TODO lock oft
+    child->oft = open_file_table_create();
+	if (child->oft == NULL) {
+		proc_destroy(child);
+		return ENOMEM;
+	}
     // copy open file table
     result = open_file_table_copy(curproc->oft, child->oft);
     if (result) {
-        spinlock_release(&curproc->p_lock);
         return result;
     }
 
-    spinlock_release(&curproc->p_lock);
+    struct trapframe *tempTfCopy = kmalloc(sizeof(struct trapframe));
+    if (tempTfCopy == NULL) {
+        return ENOMEM;
+    }
+
+    memcpy(tempTfCopy, tf, sizeof(struct trapframe));
 
     result = thread_fork("child proc",
                         child,
                         help_enter_forked_process,
-                        tf,
+                        tempTfCopy,
                         0);
     if (result) {
         return -1;

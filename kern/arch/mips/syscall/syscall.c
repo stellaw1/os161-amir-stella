@@ -252,14 +252,14 @@ enter_forked_process(struct trapframe *tf)
     //copy parent trapframe content
     memcpy(&child_tf, tf, sizeof(struct trapframe));
 
+	kfree(tf);
+
 	// set return value register for child proc
     child_tf.tf_v0 = 0;
+    child_tf.tf_a3 = 0;
 	child_tf.tf_epc += 4;
 
 	as_activate();
-
-    KASSERT(curproc->pid != 0);
-    KASSERT(curproc->pid != 1);
 
     mips_usermode(&child_tf);
 }

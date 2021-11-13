@@ -117,9 +117,9 @@ open_file_table_copy(struct open_file_table *old_oft, struct open_file_table *ne
     }
 
     lock_acquire(old_oft->table_lock);
-    for (int fd = 3; fd < OPEN_MAX; fd++) {
+    lock_acquire(new_oft->table_lock);
+    for (int fd = 0; fd < OPEN_MAX; fd++) {
         if (old_oft->table[fd] != NULL) {
-
             //assign any non NULL fd pointers to new_oft at the same index
             new_oft->table[fd] = old_oft->table[fd];
 
@@ -127,6 +127,7 @@ open_file_table_copy(struct open_file_table *old_oft, struct open_file_table *ne
             open_file_incref(old_oft->table[fd]);
         }
     }
+    lock_release(new_oft->table_lock);
     lock_release(old_oft->table_lock);
 
     return 0;

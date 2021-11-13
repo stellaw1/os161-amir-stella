@@ -254,7 +254,7 @@ proc_create_runprogram(const char *name)
 	for (int i = PID_MIN; i < PID_MAX; i++) {
 		if (pid_table[i] == NULL) {
 			newproc->pid = i;
-			pid_table[i] = newproc;
+			// pid_table[i] = newproc;
 			break;
 		} else if (i == PID_MAX - 1) {
 			return NULL;
