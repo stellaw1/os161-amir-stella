@@ -52,7 +52,6 @@
 #include <openfile.h>
 #include <synch.h>
 #include <limits.h>
-#include <kern/errno.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -256,7 +255,7 @@ proc_create_runprogram(const char *name)
 			pid_table[i] = newproc;
 			break;
 		} else if (i == PID_MAX - 1) {
-			return ENPROC;
+			return NULL;
 		}
 	}
 
