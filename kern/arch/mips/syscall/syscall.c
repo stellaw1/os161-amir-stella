@@ -34,6 +34,7 @@
 #include <mips/trapframe.h>
 #include <thread.h>
 #include <current.h>
+#include <proc.h>
 #include <syscall.h>
 #include <file_syscalls.h>
 #include <proc_syscalls.h>
@@ -41,6 +42,7 @@
 #include <uio.h>
 #include <kern/iovec.h>
 #include <endian.h>
+#include <addrspace.h>
 
 
 /*
@@ -142,7 +144,7 @@ syscall(struct trapframe *tf)
 		//third argument int whence exists on the user stack
 		const_userptr_t arg_addr = (const_userptr_t) tf->tf_sp + 16;
 		int whence;
-		
+
 		err = copyin(arg_addr, &whence, 4);
 		if (err) {
 			break;
@@ -155,7 +157,7 @@ syscall(struct trapframe *tf)
 			kfree(pos);
 			break;
 		}
-		
+
 		//perform lseek
 		err = lseek(tf->tf_a0, (off_t) *pos, whence, (off_t *) ret_pos);
 
@@ -167,11 +169,11 @@ syscall(struct trapframe *tf)
 		kfree(pos);
 		break;
 
-		case SYS_chdir: 
+		case SYS_chdir:
 		err = chdir((const_userptr_t) tf->tf_a0);
 		break;
 
-		case SYS___getcwd: 
+		case SYS___getcwd:
 		err = __getcwd((userptr_t) tf->tf_a0, (size_t) tf->tf_a1, &retval);
 		break;
 
@@ -182,7 +184,7 @@ syscall(struct trapframe *tf)
 		case SYS_fork:
 		err = fork(tf, &retval);
 		break;
-		
+
 		// case SYS_execv:
 		// err = sys_execv((const char *) tf->tf_a0, (char **) tf->tf_a1);
 		// break;
@@ -196,7 +198,7 @@ syscall(struct trapframe *tf)
 		// break;
 
 		case SYS_getpid:
-		err = sys_getpid(&retval);
+		err = getpid(&retval);
 		break;
 
 	    default:
@@ -250,9 +252,14 @@ enter_forked_process(struct trapframe *tf)
     //copy parent trapframe content
     memcpy(&child_tf, tf, sizeof(struct trapframe));
 
-	// set return value register for child proc
+	  kfree(tf);
+
+	  // set return value register for child proc
     child_tf.tf_v0 = 0;
-	child_tf.tf_epc += 4;
+    child_tf.tf_a3 = 0;
+	  child_tf.tf_epc += 4;
+
+	  as_activate();
 
     mips_usermode(&child_tf);
 }

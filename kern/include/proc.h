@@ -63,7 +63,7 @@ struct proc {
 
 	struct open_file_table *oft;
 
-	int pid;
+	pid_t pid;
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
