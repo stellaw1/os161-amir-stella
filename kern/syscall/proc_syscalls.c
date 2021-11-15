@@ -94,21 +94,6 @@ fork(struct trapframe *tf, int *retval)
     return 0;
 }
 
-void
-kfree_buf(char **buf) {
-    for (int j = 0; j < i; j++) {
-        kfree(buf[j]);
-    }
-    kfree(buf);
-}
-
-void
-kfree_newas(struct addrspace *oldas, struct addrspace *newas) {
-    proc_setas(oldas);
-    as_activate();
-    proc_destroy(newas);
-}
-
 int
 get_arglen(char arg[ARG_MAX]) {
     int i;
@@ -136,19 +121,10 @@ int execv(const char *program, char **args)
 {
     int argc;
     int err = 0;
-    char *arg_pointer;
-    char curarg[ARG_MAX];
+    char **arg_pointer = kmalloc(sizeof(char*));
     int bufsize = 0;
-    for (argc = 0; argc <= ARG_MAX || args[argc] == NULL; argc++) {
-        err = copyin(args[argc], &arg_pointer, sizeof(char*));
-        if (err) {
-            return err;
-        }
-        err = copyinstr(arg_pointer, curarg, sizeof(char) * ARG_MAX, NULL);
-        if (err) {
-            return err;
-        }
-        bufsize += get_arglen(curarg);
+    for (argc = 0; argc <= ARG_MAX && args[argc] != NULL; argc++) {
+        bufsize += strlen(args[argc]) + 1;
     }
 
     if (argc > ARG_MAX) {
@@ -158,55 +134,55 @@ int execv(const char *program, char **args)
     // buffer size needs to account for argument pointers (+1 for NULL pointer)
     bufsize += (argc + 1) * sizeof(char *);
 
-    char **kbuf = kmalloc(bufsize);
-    if (kbuf == NULL) {
+    char **argsbuf = kmalloc(bufsize);
+    if (argsbuf == NULL) {
         return ENOMEM;
     }
 
     int curarg_offset = (argc + 1) * sizeof(char *);
 
     for (int i = 0; i < argc; i++) {
-        err = copyin(args[i], &arg_pointer, sizeof(char*));
+        err = copyin((userptr_t) &args[i], arg_pointer, sizeof(char*));
         if (err) {
-            kfree(kbuf);
+            kfree(argsbuf);
             return err;
         }
-        err = copyinstr(arg_pointer, curarg, sizeof(char) * ARG_MAX, NULL);
+        int arglen = strlen(args[i]) + 1;
+        err = copyinstr((userptr_t) args[i], (char *) (argsbuf + curarg_offset), sizeof(char) * arglen, NULL);
         if (err) {
-            kfree(kbuf);
+            kfree(argsbuf);
             return err;
         }
-        int str_size = get_arglen(curarg);
-        memcpy(argsbuf + curarg_offset, curarg, str_size);
-        curarg_offset += str_size;
-        *(argsbuf + i * sizeof(char*)) = &curarg;
+        *(argsbuf + i * sizeof(char*)) = (char*) (argsbuf + curarg_offset);
+        arglen += arglen % 4 == 0 ? 0 : (4 - (arglen % 4));
+        curarg_offset += arglen;
     }
 
     *(argsbuf + argc * sizeof(char*)) = 0;
 
     char *progname = kmalloc(strlen(program));
     if (progname == NULL) {
-        kfree_buf(argsbuf);
+        kfree(argsbuf);
         return ENOMEM;
     }
-    err = copyin(program, progname, strlen(program));
+    err = copyinstr((userptr_t) program, progname, strlen(program), NULL);
     if (err) {
-        kfree_buf(argsbuf);
+        kfree(argsbuf);
         kfree(progname);
         return err;
     }
 
-    struct *vnode prog_vn;
+    struct vnode *prog_vn;
     err = vfs_open(progname, O_RDONLY, 0, &prog_vn);
     if (err) {
-        kfree_buf(argsbuf);
+        kfree(argsbuf);
         kfree(progname);
         return err;
     }
 
     struct addrspace *newas = as_create();
     if (newas == NULL) {
-        kfree_buf(argsbuf);
+        kfree(argsbuf);
         kfree(progname);
         return ENOMEM;
     }
@@ -218,27 +194,32 @@ int execv(const char *program, char **args)
 
     err = load_elf(prog_vn, &entrypoint);
     if (err) {
-        kfree_buf(argsbuf);
+        kfree(argsbuf);
         kfree(progname);
-        kfree_newas(oldas, newas);
+        proc_setas(oldas);
+        as_activate();
+        as_destroy(newas);
         return err;
     }
 
     vaddr_t stackptr;
     err = as_define_stack(newas, &stackptr);
     if (err) {
-        kfree_buf(argsbuf);
+        kfree(argsbuf);
         kfree(progname);
-        kfree_newas(oldas, newas);
+        proc_setas(oldas);
+        as_activate();
+        as_destroy(newas);
         return err;
     }
 
     // TODO: copy arguments to new address space
 
-    as_destroy(oldas);
+    // as_destroy(oldas);
 
-    userptr_t argv, env;
-    enter_new_process(argc, argv, env, stackptr, entrypoint);
+    // userptr_t argv, env;
+    // enter_new_process(argc, argv, env, stackptr, entrypoint);
+    return 0;
 }
 
 // /*
