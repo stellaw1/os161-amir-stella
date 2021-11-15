@@ -14,7 +14,7 @@
  * Generates a new open file table structure
  */
 struct open_file_table *
-open_file_table_create() 
+open_file_table_create()
 {
     struct open_file_table *oft;
     oft = kmalloc(sizeof(struct open_file_table));
@@ -36,13 +36,13 @@ open_file_table_create()
 }
 
 /*
- * Generates special file descriptors 0, 1, and 2 that are used for stdin, 
+ * Generates special file descriptors 0, 1, and 2 that are used for stdin,
  * stdout, and stderr
  *
  * returns:     0 on success and an errcode or -1 otherwise
  */
-int 
-special_fd_create(struct open_file_table *oft) 
+int
+special_fd_create(struct open_file_table *oft)
 {
     for (int fd = 0; fd < 3; fd++) {
         char console_path[32];
@@ -116,9 +116,10 @@ open_file_table_copy(struct open_file_table *old_oft, struct open_file_table *ne
         return -1;
     }
 
-    for (int fd = 3; fd < OPEN_MAX; fd++) {
+    lock_acquire(old_oft->table_lock);
+    lock_acquire(new_oft->table_lock);
+    for (int fd = 0; fd < OPEN_MAX; fd++) {
         if (old_oft->table[fd] != NULL) {
-
             //assign any non NULL fd pointers to new_oft at the same index
             new_oft->table[fd] = old_oft->table[fd];
 
@@ -126,5 +127,8 @@ open_file_table_copy(struct open_file_table *old_oft, struct open_file_table *ne
             open_file_incref(old_oft->table[fd]);
         }
     }
+    lock_release(new_oft->table_lock);
+    lock_release(old_oft->table_lock);
+
     return 0;
 }
