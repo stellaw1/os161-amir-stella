@@ -52,6 +52,7 @@
 #include <openfile.h>
 #include <synch.h>
 #include <limits.h>
+#include <kern/errno.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
