@@ -95,16 +95,11 @@ fork(struct trapframe *tf, int *retval)
 }
 
 int
-get_arglen(char arg[ARG_MAX]) {
-    int i;
-    for (i = 0; arg[i] != '\0'; i++);
-
-    // increment by one for null terminating character
-    i++;
-    if (i % 4 == 0) {
-        return i;
+get_arglen(int arglen) {
+    if (arglen % 4 == 0) {
+        return arglen;
     }
-    return (i / 4 + 1) * 4;
+    return (arglen / 4 + 1) * 4;
 }
 
 /*
@@ -154,18 +149,18 @@ int execv(const char *program, char **args)
             return err;
         }
         *(argsbuf + i * sizeof(char*)) = (char*) (argsbuf + curarg_offset);
-        arglen += arglen % 4 == 0 ? 0 : (4 - (arglen % 4));
+        arglen = get_arglen(arglen);
         curarg_offset += arglen;
     }
 
     *(argsbuf + argc * sizeof(char*)) = 0;
 
-    char *progname = kmalloc(strlen(program));
+    char *progname = kmalloc(strlen(program) + 1);
     if (progname == NULL) {
         kfree(argsbuf);
         return ENOMEM;
     }
-    err = copyinstr((userptr_t) program, progname, strlen(program), NULL);
+    err = copyinstr((userptr_t) program, progname, strlen(program) + 1, NULL);
     if (err) {
         kfree(argsbuf);
         kfree(progname);
@@ -212,10 +207,27 @@ int execv(const char *program, char **args)
         as_destroy(newas);
         return err;
     }
+    
+    int args_stack_start = stackptr - bufsize;
+    curarg_offset = args_stack_start + (argc + 1) * sizeof(char*);
+    for (int i = 0; i < argc; i++) {
+        int arglen = strlen(*(argsbuf + i * sizeof(char*)));
+        arglen = get_arglen(arglen);
+        *(argsbuf + i * sizeof(char*)) = (char*) (curarg_offset);
+        curarg_offset += arglen;
+    }
+    
+    err = copyout(argsbuf, (userptr_t) args_stack_start, bufsize);
+    if (err) {
+        kfree(argsbuf);
+        kfree(progname);
+        proc_setas(oldas);
+        as_activate();
+        as_destroy(newas);
+        return err;
+    }
 
-    // TODO: copy arguments to new address space
-
-    // as_destroy(oldas);
+    as_destroy(oldas);
 
     // userptr_t argv, env;
     // enter_new_process(argc, argv, env, stackptr, entrypoint);

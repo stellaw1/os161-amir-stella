@@ -15,6 +15,6 @@ int execv(const char *program, char **args);
 int getpid(int *retval);
 
 // helper functions
-int get_arglen(char arg[ARG_MAX]);
+int get_arglen(int arglen);
 
 #endif
