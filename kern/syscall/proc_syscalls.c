@@ -230,10 +230,11 @@ int execv(const char *program, char **args)
         return err;
     }
 
+    stackptr -= bufsize;
+
     as_destroy(oldas);
 
-    // userptr_t argv, env;
-    // enter_new_process(argc, argv, env, stackptr, entrypoint);
+    enter_new_process(argc, (userptr_t) stackptr, NULL, stackptr, entrypoint);
     return 0;
 }
 
