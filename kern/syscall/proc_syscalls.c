@@ -109,6 +109,19 @@ kfree_newas(struct addrspace *oldas, struct addrspace *newas) {
     proc_destroy(newas);
 }
 
+int
+get_arglen(char arg[ARG_MAX]) {
+    int i;
+    for (i = 0; arg[i] != '\0'; i++);
+
+    // increment by one for null terminating character
+    i++;
+    if (i % 4 == 0) {
+        return i;
+    }
+    return (i / 4 + 1) * 4;
+}
+
 /*
  * execute a program
  * ------------
@@ -123,27 +136,53 @@ int execv(const char *program, char **args)
 {
     int argc;
     int err = 0;
-    for (argc = 0; args[argc] != NULL; argc++);
-    if (argc >= ARG_MAX) {
+    char *arg_pointer;
+    char curarg[ARG_MAX];
+    int bufsize = 0;
+    for (argc = 0; argc <= ARG_MAX || args[argc] == NULL; argc++) {
+        err = copyin(args[argc], &arg_pointer, sizeof(char*));
+        if (err) {
+            return err;
+        }
+        err = copyinstr(arg_pointer, curarg, sizeof(char) * ARG_MAX, NULL);
+        if (err) {
+            return err;
+        }
+        bufsize += get_arglen(curarg);
+    }
+
+    if (argc > ARG_MAX) {
         return E2BIG;
     }
-    char **argsbuf = kmalloc(sizeof(char*) * argc);
-    if (argsbuf == NULL) {
+
+    // buffer size needs to account for argument pointers (+1 for NULL pointer)
+    bufsize += (argc + 1) * sizeof(char *);
+
+    char **kbuf = kmalloc(bufsize);
+    if (kbuf == NULL) {
         return ENOMEM;
     }
 
+    int curarg_offset = (argc + 1) * sizeof(char *);
+
     for (int i = 0; i < argc; i++) {
-        argsbuf[i] = kmalloc(strlen(args[i]));
-        if (argsbuf[i] == NULL) {
-            kfree_buf(argsbuf);
-            return ENOMEM;
-        }
-        err = copyin(args[i], argsbuf[i], strlen(args[i]));
+        err = copyin(args[i], &arg_pointer, sizeof(char*));
         if (err) {
-            kfree_buf(argsbuf);
+            kfree(kbuf);
             return err;
         }
+        err = copyinstr(arg_pointer, curarg, sizeof(char) * ARG_MAX, NULL);
+        if (err) {
+            kfree(kbuf);
+            return err;
+        }
+        int str_size = get_arglen(curarg);
+        memcpy(argsbuf + curarg_offset, curarg, str_size);
+        curarg_offset += str_size;
+        *(argsbuf + i * sizeof(char*)) = &curarg;
     }
+
+    *(argsbuf + argc * sizeof(char*)) = 0;
 
     char *progname = kmalloc(strlen(program));
     if (progname == NULL) {
