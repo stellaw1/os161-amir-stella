@@ -127,16 +127,25 @@ fork(struct trapframe *tf, int *retval)
 
 // }
 
-// /*
-//  * terminate current process
-//  * ------------
-//  *
-//  * exitcode:    7 bit wide value that is reported to other processes bia waitpid()
-//  */
-// int _exit(int exitcode)
-// {
+/*
+ * terminate current process
+ * ------------
+ *
+ * exitcode:    7 bit wide value that is reported to other processes bia waitpid()
+ */
+int _exit(int exitcode)
+{
+    // deal with children
 
-// }
+    // set pid and proc exit status
+    set_pid_exitStatus(curproc-> pid, true);
+    set_pid_exitCode(curproc-> pid, exitcode);
+    
+    thread_exit();
+
+    panic("exit syscall should not reach here");
+    return 0;
+}
 
 /*
  * get process id

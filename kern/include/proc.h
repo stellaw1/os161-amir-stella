@@ -91,4 +91,10 @@ struct addrspace *proc_getas(void);
 struct addrspace *proc_setas(struct addrspace *);
 
 
+/*
+ * pid helper functions
+ */
+void set_pid_exitStatus(pid_t pidIndex, bool exitStatus);
+void set_pid_exitCode(pid_t pidIndex, int exitCode);
+
 #endif /* _PROC_H_ */

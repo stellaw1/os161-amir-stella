@@ -13,7 +13,8 @@ struct pid
 {
 	pid_t parentPid;
 
-	bool status;
+	bool exitStatus;
+	int exitCode;
 
   	// struct semaphore *p_sem;
 };
