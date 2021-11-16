@@ -326,7 +326,7 @@ proc_create_runprogram(const char *name)
 				return 0;
 			}
 			pid_table[i]->exitFlag = false;
-			pid_table[i]->exitLock = sem_create("exitLock", 1);
+			pid_table[i]->exitLock = sem_create("exitLock", 0);
 			pid_table[i]->parentPid = curproc->pid;
 
 			newproc->pid = i;
