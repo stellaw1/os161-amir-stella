@@ -124,6 +124,10 @@ fork(struct trapframe *tf, int *retval)
  */
 int waitpid(int pid, userptr_t status, int options, int *retval)
 {
+    if (options != 0) {
+        return EINVAL;
+    }
+    
     if (!get_pid_in_table(pid)){
         return ESRCH;
     }
@@ -135,12 +139,23 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
     }
 
     int result;
-    int exitStatus;
 
-    exitStatus = get_pid_exitStatus(pid);
+    // get curproc pid
+    // check that we are parent of child proc pointed to by pid
+    // decrement child_lock semaphore count (blocks until exit syscall is called on proc with pid entry holding lock)
+    // set exit status
+    // pid_destroy
+    // proc_destroy
 
-    // set exit status of pid process in location pointed to by status
-    result = copyout(&exitStatus, status, sizeof(int));
+    // set status value only if status pointer is not NULL
+    if (status != NULL) {
+        int exitStatus;
+
+        exitStatus = get_pid_exitStatus(pid);
+
+        // set exit status of pid process in location pointed to by status
+        result = copyout(&exitStatus, status, sizeof(int));
+    }
     
     *retval = pid;
 
@@ -161,6 +176,7 @@ int _exit(int exitcode)
     set_pid_exitFlag(curproc-> pid, true);
     set_pid_exitStatus(curproc-> pid, _MKWAIT_EXIT(exitcode));
     
+    // TODO increment child_lock semaphore count
     thread_exit();
 
     panic("exit syscall should not reach here");
