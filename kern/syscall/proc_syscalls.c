@@ -246,7 +246,7 @@ int execv(const char *program, char **args)
         stackptr += get_arglen(arglen);
     }
 
-    arglocs[argc] = 0;
+    arg_locs[argc] = 0;
 
     kfree_buf(argsbuf);
 
