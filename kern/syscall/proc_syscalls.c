@@ -112,20 +112,40 @@ fork(struct trapframe *tf, int *retval)
 
 // }
 
-// /*
-//  * wait for a process to exit
-//  * ------------
-//  *
-//  * pid:         specifies process to wait on
-//  * status:      points to encoded exit status integer
-//  * options:     0
-//  *
-//  * returns:     returns pid on success and -1 or error code on error
-//  */
-// int waitpid(int pid, userptr_t status, int options, int *retval)
-// {
+/*
+ * wait for a process to exit
+ * ------------
+ *
+ * pid:         specifies process to wait on
+ * status:      points to encoded exit status integer
+ * options:     0
+ *
+ * returns:     returns pid on success and -1 or error code on error
+ */
+int waitpid(int pid, userptr_t status, int options, int *retval)
+{
+    if (!get_pid_in_table(pid)){
+        return ESRCH;
+    }
 
-// }
+    if (get_pid_has_exited(pid)) {
+        // set return val ?
+        
+        return 0;
+    }
+
+    int result;
+    int exitStatus;
+
+    exitStatus = get_pid_exitStatus(pid);
+
+    // set exit status of pid process in location pointed to by status
+    result = copyout(&exitStatus, status, sizeof(int));
+    
+    *retval = pid;
+
+    return 0;
+}
 
 /*
  * terminate current process
@@ -138,8 +158,8 @@ int _exit(int exitcode)
     // deal with children
 
     // set pid and proc exit status
-    set_pid_exitStatus(curproc-> pid, true);
-    set_pid_exitCode(curproc-> pid, exitcode);
+    set_pid_exitFlag(curproc-> pid, true);
+    set_pid_exitStatus(curproc-> pid, _MKWAIT_EXIT(exitcode));
     
     thread_exit();
 

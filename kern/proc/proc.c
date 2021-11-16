@@ -68,9 +68,6 @@ struct lock *pid_table_lock;
 
 
 
-/*
- * init_proc_pid
- */
 static int
 init_proc_pid()
 {
@@ -81,7 +78,7 @@ init_proc_pid()
 			if (pid_table[i] == NULL) {
 				return 0;
 			}
-			pid_table[i]->exitStatus = false;
+			pid_table[i]->exitFlag = false;
 			
 			lock_release(pid_table_lock);
 			return i;
@@ -95,22 +92,38 @@ init_proc_pid()
 	return 0;
 }
 
-/*
- * set_pid_exitStatus
- */
 void
-set_pid_exitStatus(pid_t pidIndex, bool exitStatus)
+set_pid_exitFlag(pid_t pidIndex, bool exitFlag)
+{
+	pid_table[pidIndex]->exitFlag = exitFlag;
+}
+
+void
+set_pid_exitStatus(pid_t pidIndex, int exitStatus)
 {
 	pid_table[pidIndex]->exitStatus = exitStatus;
 }
 
-/*
- * set_pid_exitCode
- */
-void
-set_pid_exitCode(pid_t pidIndex, int exitCode)
+int
+get_pid_exitStatus(pid_t pidIndex)
 {
-	pid_table[pidIndex]->exitCode = exitCode;
+	KASSERT(pid_table[pidIndex] != NULL);
+
+	return pid_table[pidIndex]->exitStatus;
+}
+
+bool
+get_pid_in_table(pid_t pidIndex)
+{
+	return pid_table[pidIndex] != NULL;
+}
+
+bool
+get_pid_has_exited(pid_t pidIndex)
+{
+	KASSERT(pid_table[pidIndex] != NULL);
+	
+	return pid_table[pidIndex]->exitFlag;
 }
 
 
