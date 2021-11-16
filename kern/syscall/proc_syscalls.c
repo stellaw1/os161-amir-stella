@@ -165,6 +165,12 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
 
         exitStatus = get_pid_exitStatus(pid);
 
+        if (WEXITSTATUS(exitStatus)) {
+            exitStatus = _MKWAIT_EXIT(exitStatus);
+        } else {
+            exitStatus = _MKWAIT_SIG(exitStatus);
+        }
+
         // set exit status of pid process in location pointed to by status
         result = copyout(&exitStatus, status, sizeof(int));
         if (result) {
@@ -200,7 +206,7 @@ int _exit(int exitcode)
 
     // set pid and proc exit status
     set_pid_exitFlag(curpid, true);
-    set_pid_exitStatus(curpid, _MKWAIT_EXIT(exitcode));
+    set_pid_exitStatus(curpid,exitcode);
     
     //increment child_lock semaphore count
     struct semaphore *exitLock = get_exitLock(curpid);
