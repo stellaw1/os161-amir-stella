@@ -22,6 +22,7 @@
 #include <kern/seek.h>
 #include <kern/unistd.h>
 #include <addrspace.h>
+#include <kern/wait.h>
 
 /*
  * Support functions.
@@ -55,7 +56,13 @@ fork(struct trapframe *tf, int *retval)
         return ENPROC;
     }
 
-    // TODO add child pid to array
+    // add child pid to array
+    unsigned *index_ret = kmalloc(sizeof(unsigned));
+    if (index_ret == NULL) {
+        return -1;
+    }
+
+    array_add(curproc->childProcs, child, index_ret);
 
     // copy stack
     result = as_copy(curproc->p_addrspace, &child->p_addrspace);
@@ -141,13 +148,18 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
     int result;
 
     // get curproc pid
-    // check that we are parent of child proc pointed to by pid
-    // decrement child_lock semaphore count (blocks until exit syscall is called on proc with pid entry holding lock)
-    // set exit status
-    // pid_destroy
-    // proc_destroy
+    pid_t curpid = curproc->pid;
 
-    // set status value only if status pointer is not NULL
+    // check that we are parent of child proc pointed to by pid
+    if (get_parent_pid(pid) != curpid) {
+        return ECHILD;
+    }
+
+    // decrement child_lock semaphore count (blocks until exit syscall is called on proc with pid entry holding lock)
+    struct semaphore *exitLock = get_exitLock(curpid);
+    P(exitLock);
+
+    // set exit status value only if status pointer is not NULL
     if (status != NULL) {
         int exitStatus;
 
@@ -155,8 +167,22 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
 
         // set exit status of pid process in location pointed to by status
         result = copyout(&exitStatus, status, sizeof(int));
+        if (result) {
+            return result;
+        }
+    }
+
+    // get pid process and destroy
+    for (unsigned i = 0; i < curproc->childProcs->num; i++) {
+        struct proc *childProc = array_get(curproc->childProcs, i);
+        if (childProc->pid == pid) {
+            proc_destroy(childProc);
+        }
     }
     
+    // pid_destroy
+    destroy_pid_entry(pid);
+
     *retval = pid;
 
     return 0;
@@ -170,13 +196,16 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
  */
 int _exit(int exitcode)
 {
-    // deal with children
+    pid_t curpid = curproc->pid;
 
     // set pid and proc exit status
-    set_pid_exitFlag(curproc-> pid, true);
-    set_pid_exitStatus(curproc-> pid, _MKWAIT_EXIT(exitcode));
+    set_pid_exitFlag(curpid, true);
+    set_pid_exitStatus(curpid, _MKWAIT_EXIT(exitcode));
     
-    // TODO increment child_lock semaphore count
+    //increment child_lock semaphore count
+    struct semaphore *exitLock = get_exitLock(curpid);
+    V(exitLock);
+
     thread_exit();
 
     panic("exit syscall should not reach here");

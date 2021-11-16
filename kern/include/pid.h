@@ -11,7 +11,7 @@
 struct pid
 {
 	pid_t parentPid;
-	struct semaphore *child_lock;
+	struct semaphore *exitLock;
 
 	bool exitFlag;
 	int exitStatus;

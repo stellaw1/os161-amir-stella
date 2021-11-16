@@ -68,28 +68,17 @@ struct lock *pid_table_lock;
 
 
 
-static int
-init_proc_pid()
+void
+destroy_pid_entry(pid_t pidIndex)
 {
 	lock_acquire(pid_table_lock);
-	for (int i = PID_MIN; i < PID_MAX; i++) {
-		if (pid_table[i] == NULL) {
-			pid_table[i] = kmalloc(sizeof(struct pid));
-			if (pid_table[i] == NULL) {
-				return 0;
-			}
-			pid_table[i]->exitFlag = false;
-			
-			lock_release(pid_table_lock);
-			return i;
-		} else if (i == PID_MAX - 1) {
-			
-			lock_release(pid_table_lock);
-			return 0;
-		}
+
+	if (pid_table[pidIndex] != NULL){
+		sem_destroy(pid_table[pidIndex]->exitLock);
+		kfree(pid_table[pidIndex]);
 	}
+	
 	lock_release(pid_table_lock);
-	return 0;
 }
 
 void
@@ -124,6 +113,22 @@ get_pid_has_exited(pid_t pidIndex)
 	KASSERT(pid_table[pidIndex] != NULL);
 	
 	return pid_table[pidIndex]->exitFlag;
+}
+
+pid_t
+get_parent_pid(pid_t pidIndex)
+{
+	KASSERT(pid_table[pidIndex] != NULL);
+	
+	return pid_table[pidIndex]->parentPid;
+}
+
+struct semaphore*
+get_exitLock(pid_t pidIndex)
+{
+	KASSERT(pid_table[pidIndex] != NULL);
+	
+	return pid_table[pidIndex]->exitLock;
 }
 
 
@@ -313,11 +318,28 @@ proc_create_runprogram(const char *name)
 		return NULL;
 	}
 
-	int pid = init_proc_pid();
-	if (!pid) {
-		return NULL;
+	lock_acquire(pid_table_lock);
+	for (int i = PID_MIN; i < PID_MAX; i++) {
+		if (pid_table[i] == NULL) {
+			pid_table[i] = kmalloc(sizeof(struct pid));
+			if (pid_table[i] == NULL) {
+				return 0;
+			}
+			pid_table[i]->exitFlag = false;
+			pid_table[i]->exitLock = sem_create("exitLock", 1);
+			pid_table[i]->parentPid = curproc->pid;
+
+			newproc->pid = i;
+			
+			break;
+		} else if (i == PID_MAX - 1) {
+			lock_release(pid_table_lock);
+			return NULL; // TODO return ENPROC
+		}
 	}
-	newproc->pid = pid;
+	lock_release(pid_table_lock);
+
+	newproc->childProcs = array_create();
 
 	return newproc;
 }
