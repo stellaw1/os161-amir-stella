@@ -77,7 +77,7 @@ destroy_pid_entry(pid_t pidIndex)
 		sem_destroy(pid_table[pidIndex]->exitLock);
 		kfree(pid_table[pidIndex]);
 	}
-	
+
 	lock_release(pid_table_lock);
 }
 
@@ -104,6 +104,10 @@ get_pid_exitStatus(pid_t pidIndex)
 bool
 get_pid_in_table(pid_t pidIndex)
 {
+	if (pidIndex < PID_MIN || pidIndex >= PID_MAX) {
+		return false;
+	}
+
 	return pid_table[pidIndex] != NULL;
 }
 
@@ -111,7 +115,7 @@ bool
 get_pid_has_exited(pid_t pidIndex)
 {
 	KASSERT(pid_table[pidIndex] != NULL);
-	
+
 	return pid_table[pidIndex]->exitFlag;
 }
 
@@ -119,7 +123,7 @@ pid_t
 get_parent_pid(pid_t pidIndex)
 {
 	KASSERT(pid_table[pidIndex] != NULL);
-	
+
 	return pid_table[pidIndex]->parentPid;
 }
 
@@ -127,7 +131,7 @@ struct semaphore*
 get_exitLock(pid_t pidIndex)
 {
 	KASSERT(pid_table[pidIndex] != NULL);
-	
+
 	return pid_table[pidIndex]->exitLock;
 }
 
@@ -250,6 +254,10 @@ proc_destroy(struct proc *proc)
 	kfree(proc->p_name);
 
 	open_file_table_destroy(proc->oft);
+
+	if (proc->pid) {
+    	destroy_pid_entry(proc->pid);
+	}
 }
 
 /*
@@ -330,7 +338,7 @@ proc_create_runprogram(const char *name)
 			pid_table[i]->parentPid = curproc->pid;
 
 			newproc->pid = i;
-			
+
 			break;
 		} else if (i == PID_MAX - 1) {
 			lock_release(pid_table_lock);

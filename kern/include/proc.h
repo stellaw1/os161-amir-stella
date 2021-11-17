@@ -65,6 +65,7 @@ struct proc {
 
 	pid_t pid;
 	struct array *childProcs;
+	bool parentDead;
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
