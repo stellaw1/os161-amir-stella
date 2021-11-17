@@ -77,42 +77,28 @@ destroy_pid_entry(pid_t pidIndex)
 		sem_destroy(pid_table[pidIndex]->exitLock);
 		kfree(pid_table[pidIndex]);
 	}
-<<<<<<< HEAD
-
-=======
-	
->>>>>>> master
 	lock_release(pid_table_lock);
 }
 
 void
 set_pid_exitFlag(pid_t pidIndex, bool exitFlag)
 {
-<<<<<<< HEAD
 	lock_acquire(pid_table_lock);
 	pid_table[pidIndex]->exitFlag = exitFlag;
 	lock_release(pid_table_lock);
-=======
-	pid_table[pidIndex]->exitFlag = exitFlag;
->>>>>>> master
 }
 
 void
 set_pid_exitStatus(pid_t pidIndex, int exitStatus)
 {
-<<<<<<< HEAD
 	lock_acquire(pid_table_lock);
 	pid_table[pidIndex]->exitStatus = exitStatus;
 	lock_release(pid_table_lock);
-=======
-	pid_table[pidIndex]->exitStatus = exitStatus;
->>>>>>> master
 }
 
 int
 get_pid_exitStatus(pid_t pidIndex)
 {
-<<<<<<< HEAD
 	lock_acquire(pid_table_lock);
 	KASSERT(pid_table[pidIndex] != NULL);
 
@@ -120,17 +106,11 @@ get_pid_exitStatus(pid_t pidIndex)
 	lock_release(pid_table_lock);
 
 	return ret;
-=======
-	KASSERT(pid_table[pidIndex] != NULL);
-
-	return pid_table[pidIndex]->exitStatus;
->>>>>>> master
 }
 
 bool
 get_pid_in_table(pid_t pidIndex)
 {
-<<<<<<< HEAD
 	if (pidIndex < PID_MIN || pidIndex >= PID_MAX) {
 		return false;
 	}
@@ -140,15 +120,11 @@ get_pid_in_table(pid_t pidIndex)
 	lock_release(pid_table_lock);
 
 	return ret;
-=======
-	return pid_table[pidIndex] != NULL;
->>>>>>> master
 }
 
 bool
 get_pid_has_exited(pid_t pidIndex)
 {
-<<<<<<< HEAD
 	lock_acquire(pid_table_lock);
 	KASSERT(pid_table[pidIndex] != NULL);
 
@@ -156,17 +132,11 @@ get_pid_has_exited(pid_t pidIndex)
 	lock_release(pid_table_lock);
 
 	return ret;
-=======
-	KASSERT(pid_table[pidIndex] != NULL);
-	
-	return pid_table[pidIndex]->exitFlag;
->>>>>>> master
 }
 
 pid_t
 get_parent_pid(pid_t pidIndex)
 {
-<<<<<<< HEAD
 	lock_acquire(pid_table_lock);
 	KASSERT(pid_table[pidIndex] != NULL);
 
@@ -174,17 +144,11 @@ get_parent_pid(pid_t pidIndex)
 	lock_release(pid_table_lock);
 
 	return ret;
-=======
-	KASSERT(pid_table[pidIndex] != NULL);
-	
-	return pid_table[pidIndex]->parentPid;
->>>>>>> master
 }
 
 struct semaphore*
 get_exitLock(pid_t pidIndex)
 {
-<<<<<<< HEAD
 	lock_acquire(pid_table_lock);
 	KASSERT(pid_table[pidIndex] != NULL);
 
@@ -192,11 +156,6 @@ get_exitLock(pid_t pidIndex)
 	lock_release(pid_table_lock);
 
 	return ret;
-=======
-	KASSERT(pid_table[pidIndex] != NULL);
-	
-	return pid_table[pidIndex]->exitLock;
->>>>>>> master
 }
 
 
@@ -413,11 +372,6 @@ proc_create_runprogram(const char *name)
 			pid_table[i]->parentPid = curproc->pid;
 
 			newproc->pid = i;
-<<<<<<< HEAD
-
-=======
-			
->>>>>>> master
 			break;
 		} else if (i == PID_MAX - 1) {
 			lock_release(pid_table_lock);
@@ -426,13 +380,9 @@ proc_create_runprogram(const char *name)
 	}
 	lock_release(pid_table_lock);
 
-<<<<<<< HEAD
 	newproc->parentDead = false;
 	newproc->childProcs = array_create();
 	newproc->childProcsLock = lock_create("childProcsLock");
-=======
-	newproc->childProcs = array_create();
->>>>>>> master
 
 	return newproc;
 }
