@@ -141,6 +141,9 @@ common_prog(int nargs, char **args)
 		return result;
 	}
 	
+	/* proc has no proper parent pid so we can't use waitpid to block instead 
+	 * we just use the exitLock on proc to block the menu thread until it exits
+	 */
 	struct semaphore *exitLock = get_exitLock(proc->pid);
     P(exitLock);
 
