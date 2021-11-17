@@ -808,6 +808,12 @@ thread_exit(void)
 	/* Interrupts off on this processor */
         splhigh();
 	thread_switch(S_ZOMBIE, NULL, NULL);
+
+	// if parent already dead then kill the process
+	if (curproc->parentDead) {
+		proc_destroy(curproc);
+	}
+
 	panic("braaaaaaaiiiiiiiiiiinssssss\n");
 }
 

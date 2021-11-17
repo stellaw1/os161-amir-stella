@@ -131,21 +131,16 @@ fork(struct trapframe *tf, int *retval)
  */
 int waitpid(int pid, userptr_t status, int options, int *retval)
 {
+    /*
+     * error checking
+     */ 
     if (options != 0) {
         return EINVAL;
     }
-    
+
     if (!get_pid_in_table(pid)){
         return ESRCH;
     }
-
-    if (get_pid_has_exited(pid)) {
-        // set return val ?
-        
-        return 0;
-    }
-
-    int result;
 
     // get curproc pid
     pid_t curpid = curproc->pid;
@@ -155,39 +150,55 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
         return ECHILD;
     }
 
-    // decrement child_lock semaphore count (blocks until exit syscall is called on proc with pid entry holding lock)
-    struct semaphore *exitLock = get_exitLock(curpid);
-    P(exitLock);
 
-    // set exit status value only if status pointer is not NULL
-    if (status != NULL) {
-        int exitStatus;
+    int result, exitStatus;
 
-        exitStatus = get_pid_exitStatus(pid);
+    // scenario 2: child proc w pid has already exited
+    // just return exitCode
+    if (get_pid_has_exited(pid)) {
+        // set exit status and return val
+        if (status != NULL) { //TODO
+            exitStatus = get_pid_exitStatus(pid);
 
-        if (WEXITSTATUS(exitStatus)) {
-            exitStatus = _MKWAIT_EXIT(exitStatus);
-        } else {
-            exitStatus = _MKWAIT_SIG(exitStatus);
+            result = copyout(&exitStatus, status, sizeof(int));
+            if (result) {
+                // EFAULT
+                return result;
+            }
+        }
+    } 
+    else { // scenario 1: parent is blocked until child exits
+        
+        // decrement child_lock semaphore count
+        struct semaphore *exitLock = get_exitLock(pid);
+        // blocks until exit syscall is called on proc with pid entry holding lock
+        P(exitLock);
+
+        // set exit status value only if status pointer is proper TODO
+        if (status != NULL) {
+
+            exitStatus = get_pid_exitStatus(pid);
+
+            // set exit status of pid process in location pointed to by status
+            result = copyout(&exitStatus, status, sizeof(int));
+            if (result) {
+                // EFAULT
+                return result;
+            }
         }
 
-        // set exit status of pid process in location pointed to by status
-        result = copyout(&exitStatus, status, sizeof(int));
-        if (result) {
-            return result;
+        // get pid process and destroy
+        lock_acquire(curproc->childProcsLock);
+        for (unsigned i = 0; i < curproc->childProcs->num; i++) {
+            struct proc *childProc = array_get(curproc->childProcs, i);
+            if (childProc->pid == pid) {
+                array_remove(curproc->childProcs, i);
+                proc_destroy(childProc);
+                break;
+            }
         }
+        lock_release(curproc->childProcsLock);
     }
-
-    // get pid process and destroy
-    for (unsigned i = 0; i < curproc->childProcs->num; i++) {
-        struct proc *childProc = array_get(curproc->childProcs, i);
-        if (childProc->pid == pid) {
-            proc_destroy(childProc);
-        }
-    }
-    
-    // pid_destroy
-    destroy_pid_entry(pid);
 
     *retval = pid;
 
@@ -202,13 +213,30 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
  */
 int _exit(int exitcode)
 {
+    // deal with children
+    lock_acquire(curproc->childProcsLock);
+    while (curproc->childProcs->num > 0) {
+        struct proc *childProc = array_get(curproc->childProcs, 0);
+        if (get_pid_has_exited(childProc->pid)) {
+            proc_destroy(childProc);
+        } else {
+            childProc->parentDead = true;
+        }
+
+        array_remove(curproc->childProcs, 0);
+    }
+
+    lock_release(curproc->childProcsLock);
+
+
+
     pid_t curpid = curproc->pid;
 
     // set pid and proc exit status
     set_pid_exitFlag(curpid, true);
-    set_pid_exitStatus(curpid,exitcode);
-    
-    //increment child_lock semaphore count
+    set_pid_exitStatus(curpid, _MKWAIT_EXIT(exitcode));
+
+    //increment child_lock semaphore count to unblock parent thread waiting on this thread to exit (if any)
     struct semaphore *exitLock = get_exitLock(curpid);
     V(exitLock);
 

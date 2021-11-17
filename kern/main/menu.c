@@ -43,6 +43,8 @@
 #include <test.h>
 #include <proc.h>
 #include <synch.h>
+#include <proc_syscalls.h>
+#include <kern/wait.h>
 #include "opt-synchprobs.h"
 #include "opt-sfs.h"
 #include "opt-net.h"
@@ -139,8 +141,6 @@ common_prog(int nargs, char **args)
 		return result;
 	}
 	
-	// while(1);
-
 	/* proc has no proper parent pid so we can't use waitpid to block instead 
 	 * we just use the exitLock on proc to block the menu thread until it exits
 	 */

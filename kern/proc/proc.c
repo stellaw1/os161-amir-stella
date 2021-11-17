@@ -77,58 +77,85 @@ destroy_pid_entry(pid_t pidIndex)
 		sem_destroy(pid_table[pidIndex]->exitLock);
 		kfree(pid_table[pidIndex]);
 	}
-	
 	lock_release(pid_table_lock);
 }
 
 void
 set_pid_exitFlag(pid_t pidIndex, bool exitFlag)
 {
+	lock_acquire(pid_table_lock);
 	pid_table[pidIndex]->exitFlag = exitFlag;
+	lock_release(pid_table_lock);
 }
 
 void
 set_pid_exitStatus(pid_t pidIndex, int exitStatus)
 {
+	lock_acquire(pid_table_lock);
 	pid_table[pidIndex]->exitStatus = exitStatus;
+	lock_release(pid_table_lock);
 }
 
 int
 get_pid_exitStatus(pid_t pidIndex)
 {
+	lock_acquire(pid_table_lock);
 	KASSERT(pid_table[pidIndex] != NULL);
 
-	return pid_table[pidIndex]->exitStatus;
+	int ret = pid_table[pidIndex]->exitStatus;
+	lock_release(pid_table_lock);
+
+	return ret;
 }
 
 bool
 get_pid_in_table(pid_t pidIndex)
 {
-	return pid_table[pidIndex] != NULL;
+	if (pidIndex < PID_MIN || pidIndex >= PID_MAX) {
+		return false;
+	}
+
+	lock_acquire(pid_table_lock);
+	bool ret = pid_table[pidIndex] != NULL;
+	lock_release(pid_table_lock);
+
+	return ret;
 }
 
 bool
 get_pid_has_exited(pid_t pidIndex)
 {
+	lock_acquire(pid_table_lock);
 	KASSERT(pid_table[pidIndex] != NULL);
-	
-	return pid_table[pidIndex]->exitFlag;
+
+	bool ret = pid_table[pidIndex]->exitFlag;
+	lock_release(pid_table_lock);
+
+	return ret;
 }
 
 pid_t
 get_parent_pid(pid_t pidIndex)
 {
+	lock_acquire(pid_table_lock);
 	KASSERT(pid_table[pidIndex] != NULL);
-	
-	return pid_table[pidIndex]->parentPid;
+
+	pid_t ret = pid_table[pidIndex]->parentPid;
+	lock_release(pid_table_lock);
+
+	return ret;
 }
 
 struct semaphore*
 get_exitLock(pid_t pidIndex)
 {
+	lock_acquire(pid_table_lock);
 	KASSERT(pid_table[pidIndex] != NULL);
-	
-	return pid_table[pidIndex]->exitLock;
+
+	struct semaphore* ret = pid_table[pidIndex]->exitLock;
+	lock_release(pid_table_lock);
+
+	return ret;
 }
 
 
@@ -250,6 +277,19 @@ proc_destroy(struct proc *proc)
 	kfree(proc->p_name);
 
 	open_file_table_destroy(proc->oft);
+
+	// clean up pid entry, childProcs array and childProcsLock
+	if (proc->pid) {
+    	destroy_pid_entry(proc->pid);
+	}
+
+	if (proc->childProcs) {
+    	array_destroy(proc->childProcs);
+	}
+	if (proc->childProcsLock) {
+    	lock_destroy(proc->childProcsLock);
+	}
+
 }
 
 /*
@@ -267,6 +307,8 @@ proc_bootstrap(void)
 	if (pid_table_lock == NULL) {
 		panic("failed to create pid table lock\n");
 	}
+
+	kproc->pid = 1;
 }
 
 /*
@@ -330,7 +372,6 @@ proc_create_runprogram(const char *name)
 			pid_table[i]->parentPid = curproc->pid;
 
 			newproc->pid = i;
-			
 			break;
 		} else if (i == PID_MAX - 1) {
 			lock_release(pid_table_lock);
@@ -339,7 +380,9 @@ proc_create_runprogram(const char *name)
 	}
 	lock_release(pid_table_lock);
 
+	newproc->parentDead = false;
 	newproc->childProcs = array_create();
+	newproc->childProcsLock = lock_create("childProcsLock");
 
 	return newproc;
 }
