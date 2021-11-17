@@ -141,17 +141,6 @@ common_prog(int nargs, char **args)
 		return result;
 	}
 	
-	// while(1);
-
-	// int retval, ret;
-
-	// pid_t procpid = proc->pid;
-
-	// KASSERT(procpid != 0);
-	// KASSERT(procpid != 1);
-
-	// ret = waitpid(procpid, NULL, 0, &retval);
-	// kprintf("%d", ret);
 	struct semaphore *exitLock = get_exitLock(proc->pid);
     P(exitLock);
 
