@@ -43,6 +43,8 @@
 #include <test.h>
 #include <proc.h>
 #include <synch.h>
+#include <proc_syscalls.h>
+#include <kern/wait.h>
 #include "opt-synchprobs.h"
 #include "opt-sfs.h"
 #include "opt-net.h"
@@ -141,9 +143,15 @@ common_prog(int nargs, char **args)
 	
 	// while(1);
 
-	/* proc has no proper parent pid so we can't use waitpid to block instead 
-	 * we just use the exitLock on proc to block the menu thread until it exits
-	 */
+	// int retval, ret;
+
+	// pid_t procpid = proc->pid;
+
+	// KASSERT(procpid != 0);
+	// KASSERT(procpid != 1);
+
+	// ret = waitpid(procpid, NULL, 0, &retval);
+	// kprintf("%d", ret);
 	struct semaphore *exitLock = get_exitLock(proc->pid);
     P(exitLock);
 

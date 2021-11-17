@@ -64,6 +64,7 @@ struct proc {
 	struct open_file_table *oft;
 
 	pid_t pid;
+	struct lock *childProcsLock;
 	struct array *childProcs;
 	bool parentDead;
 };
