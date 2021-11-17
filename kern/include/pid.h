@@ -4,23 +4,18 @@
 #include <types.h>
 #include <synch.h>
 #include <limits.h>
-#include <vnode.h>
 
 /*
- * Structure representing an open file entry in the open file table
+ * Structure representing a pid entry in the pid table
  */
 struct pid
 {
 	pid_t parentPid;
+	struct semaphore *exitLock;
 
-	bool status;
-
-  	// struct semaphore *p_sem;
+	bool exitFlag;
+	int exitStatus;
 };
-
-/*
- * functions
- */
 
 
 #endif /* _PID_H_ */

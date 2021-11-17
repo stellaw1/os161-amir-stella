@@ -189,13 +189,13 @@ syscall(struct trapframe *tf)
 		err = execv((const char *) tf->tf_a0, (char **) tf->tf_a1);
 		break;
 
-		// case SYS_waitpid:
-		// err = sys_waitpid(tf->tf_a0, (userptr_t) tf->tf_a1, tf->tf_a2, &retval);
-		// break;
+		case SYS_waitpid:
+		err = waitpid(tf->tf_a0, (userptr_t) tf->tf_a1, tf->tf_a2, &retval);
+		break;
 
-		// case SYS__exit:
-		// err = sys_exit(tf->tf_a0);
-		// break;
+		case SYS__exit:
+		err = _exit(tf->tf_a0);
+		break;
 
 		case SYS_getpid:
 		err = getpid(&retval);
@@ -252,14 +252,14 @@ enter_forked_process(struct trapframe *tf)
     //copy parent trapframe content
     memcpy(&child_tf, tf, sizeof(struct trapframe));
 
-	  kfree(tf);
+	kfree(tf);
 
-	  // set return value register for child proc
+	// set return value register for child proc
     child_tf.tf_v0 = 0;
     child_tf.tf_a3 = 0;
-	  child_tf.tf_epc += 4;
+	child_tf.tf_epc += 4;
 
-	  as_activate();
+	as_activate();
 
     mips_usermode(&child_tf);
 }
