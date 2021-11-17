@@ -139,6 +139,7 @@ int execv(const char *program, char **args)
     for (argc = 0; argc <= ARG_MAX && args[argc] != NULL; argc++);
 
     if (argc > ARG_MAX) {
+        kfree(arg_pointer);
         return E2BIG;
     }
 
@@ -246,7 +247,7 @@ int execv(const char *program, char **args)
         stackptr += get_arglen(arglen);
     }
 
-    arglocs[argc] = 0;
+    arg_locs[argc] = 0;
 
     kfree_buf(argsbuf);
 

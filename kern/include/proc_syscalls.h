@@ -4,6 +4,7 @@
 #include <cdefs.h>
 #include <kern/seek.h>
 #include <limits.h>
+#include <addrspace.h>
 
 /*
  * process syscall functions
