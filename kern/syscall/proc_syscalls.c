@@ -104,20 +104,180 @@ fork(struct trapframe *tf, int *retval)
     return 0;
 }
 
-// /*
-//  * execute a program
-//  * ------------
-//  *
-//  * program:     path name of program to replace current program with
-//  * args:        array of 0 terminated strings; array terminated by NULL pointer
-//  *
-//  * returns:     returns the process id of the new child process in the parent process;
-//  *              returns 0 in the child process
-//  */
-// int execv(const char *program, char **args)
-// {
+// free copied argument buffer
+void
+kfree_buf(char **buf) {
+    for (int i = 0; buf[i] != NULL; i++) {
+        kfree(buf[i]);
+    }
+    kfree(buf);
+}
 
-// }
+void
+kfree_newas(struct addrspace *oldas, struct addrspace *newas) {
+    proc_setas(oldas);
+    as_activate();
+    as_destroy(newas);
+}
+
+int
+get_arglen(int arglen) {
+    if (arglen % 4 == 0) {
+        return arglen;
+    }
+    return (arglen / 4 + 1) * 4;
+}
+
+/*
+ * execute a program
+ * ------------
+ *
+ * program:     path name of program to replace current program with
+ * args:        array of 0 terminated strings; array terminated by NULL pointer
+ * 
+ * returns:     returns the process id of the new child process in the parent process; 
+ *              returns 0 in the child process
+ */
+int execv(const char *program, char **args)
+{
+    int argc;
+    int err = 0;
+    char **arg_pointer = kmalloc(sizeof(char*));
+    for (argc = 0; argc <= ARG_MAX && args[argc] != NULL; argc++);
+
+    if (argc > ARG_MAX) {
+        kfree(arg_pointer);
+        return E2BIG;
+    }
+
+    // create buffer for copying argument strings
+    char **argsbuf = kmalloc(sizeof(char*) * argc);
+    if (argsbuf == NULL) {
+        kfree(arg_pointer);
+        return ENOMEM;
+    }
+
+    int bufsize = 0;
+
+    for (int i = 0; i < argc; i++) {
+        // copy in pointer to argument string for security
+        err = copyin((userptr_t) &args[i], arg_pointer, sizeof(char*));
+        if (err) {
+            kfree(arg_pointer);
+            kfree(argsbuf);
+            return err;
+        }
+        int arglen = strlen(args[i]) + 1;
+        argsbuf[i] = kmalloc(sizeof(char) * arglen);
+        if (argsbuf[i] == NULL) {
+            kfree(arg_pointer);
+            kfree_buf(argsbuf);
+            return ENOMEM;
+        } 
+        err = copyinstr((userptr_t) args[i], argsbuf[i], sizeof(char) * arglen, NULL);
+        if (err) {
+            kfree(arg_pointer);
+            kfree_buf(argsbuf);
+            return err;
+        }
+        bufsize += get_arglen(arglen);
+    }
+
+    kfree(arg_pointer);
+
+    char *progname = kmalloc(strlen(program) + 1);
+    if (progname == NULL) {
+        kfree_buf(argsbuf);
+        return ENOMEM;
+    }
+    err = copyinstr((userptr_t) program, progname, strlen(program) + 1, NULL);
+    if (err) {
+        kfree_buf(argsbuf);
+        kfree(progname);
+        return err;
+    }
+
+    struct vnode *prog_vn;
+    err = vfs_open(progname, O_RDONLY, 0, &prog_vn);
+    if (err) {
+        kfree_buf(argsbuf);
+        kfree(progname);
+        return err;
+    }
+    kfree(progname);
+
+    struct addrspace *newas = as_create();
+    if (newas == NULL) {
+        kfree_buf(argsbuf);
+        return ENOMEM;
+    }
+
+    struct addrspace *oldas = proc_setas(newas);
+    as_activate();
+
+    vaddr_t entrypoint;
+
+    err = load_elf(prog_vn, &entrypoint);
+    if (err) {
+        kfree_buf(argsbuf);
+        kfree_newas(oldas, newas);
+        return err;
+    }
+
+    vaddr_t stackptr;
+    err = as_define_stack(newas, &stackptr);
+    if (err) {
+        kfree_buf(argsbuf);
+        kfree_newas(oldas, newas);
+        return err;
+    }
+    
+    // create array for storing argument locations in user stack
+    char **arg_locs = kmalloc(sizeof(char *) * (argc + 1));
+    if (arg_locs == NULL) {
+        kfree_buf(argsbuf);
+        kfree_newas(oldas, newas);
+        return ENOMEM;
+    }
+
+    stackptr -= bufsize;
+    for (int i = 0; i < argc; i++) {
+        int arglen = strlen(argsbuf[i]) + 1;
+        err = copyoutstr(argsbuf[i], (userptr_t) stackptr, arglen, NULL);
+        if (err) {
+            kfree_buf(argsbuf);
+            kfree_newas(oldas, newas);
+            kfree(arg_locs);
+            return err;
+        }
+        arg_locs[i] = (char *) stackptr;
+        stackptr += get_arglen(arglen);
+    }
+
+    arg_locs[argc] = 0;
+
+    kfree_buf(argsbuf);
+
+    stackptr -= (bufsize + (argc + 1) * (sizeof(char *)));
+
+    for (int i = 0; i < argc + 1; i++) {
+        err = copyout(arg_locs[i], (userptr_t) stackptr, sizeof(char *));
+        if (err) {
+            kfree_newas(oldas, newas);
+            kfree(arg_locs);
+            return err;
+        }
+        stackptr += sizeof(char *);
+    }
+
+    kfree(arg_locs);
+    stackptr -= (argc + 1) * (sizeof(char *));
+
+    as_destroy(oldas);
+
+    enter_new_process(argc, (userptr_t) stackptr, NULL, stackptr, entrypoint);
+    return 0;
+}
 
 /*
  * wait for a process to exit
