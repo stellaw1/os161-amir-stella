@@ -134,22 +134,22 @@ get_arglen(int arglen) {
  *
  * program:     path name of program to replace current program with
  * args:        array of 0 terminated strings; array terminated by NULL pointer
- * 
- * returns:     returns the process id of the new child process in the parent process; 
+ *
+ * returns:     returns the process id of the new child process in the parent process;
  *              returns 0 in the child process
  */
 int execv(const char *program, char **args)
-{   
+{
     int argc;
     int err = 0;
     char **arg_pointer = kmalloc(sizeof(char*));
-    
+
     err = copyin((userptr_t) args, arg_pointer, sizeof(char**));
     if (err) {
         kfree(arg_pointer);
         return err;
     }
-    
+
     for (argc = 0; argc <= ARG_MAX && args[argc] != NULL; argc++);
 
     if (argc > ARG_MAX) {
@@ -165,7 +165,7 @@ int execv(const char *program, char **args)
     }
 
     int bufsize = 0;
-    
+
     char *arg_test = kmalloc(sizeof(char) * ARG_MAX);
     if (arg_test == NULL) {
         kfree(arg_pointer);
@@ -195,7 +195,7 @@ int execv(const char *program, char **args)
             kfree_buf(argsbuf, i-1);
             kfree(arg_test);
             return ENOMEM;
-        } 
+        }
         err = copyinstr((userptr_t) args[i], argsbuf[i], sizeof(char) * arglen, NULL);
         if (err) {
             kfree(arg_pointer);
@@ -255,7 +255,7 @@ int execv(const char *program, char **args)
         kfree_newas(oldas, newas);
         return err;
     }
-    
+
     // create array for storing argument locations in user stack
     char **arg_locs = kmalloc(sizeof(char *) * (argc + 1));
     if (arg_locs == NULL) {
@@ -340,15 +340,25 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
         if (status != NULL) {
             exitStatus = get_pid_exitStatus(pid);
 
+            if (WIFEXITED(exitStatus)) {
+                exitStatus = WEXITSTATUS(exitStatus);
+            } else if (WIFSIGNALED(exitStatus)) {
+                exitStatus = WTERMSIG(exitStatus);
+            } else if (WIFSTOPPED(exitStatus)) {
+                exitStatus = WSTOPSIG(exitStatus);
+            } else {
+                exitStatus = WCOREDUMP(exitStatus);
+            }
+
             result = copyout(&exitStatus, status, sizeof(int));
             if (result) {
                 // EFAULT
                 return result;
             }
         }
-    } 
+    }
     // scenario 1: parent is blocked until child exits
-    else { 
+    else {
         // decrement child_lock semaphore count
         struct semaphore *exitLock = get_exitLock(pid);
         // blocks until exit syscall is called on child proc with pid entry holding lock
@@ -357,6 +367,16 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
         // set exit status if status is not a NULL pointer; do nothing if it's NULL
         if (status != NULL) {
             exitStatus = get_pid_exitStatus(pid);
+
+            if (WIFEXITED(exitStatus)) {
+                exitStatus = WEXITSTATUS(exitStatus);
+            } else if (WIFSIGNALED(exitStatus)) {
+                exitStatus = WTERMSIG(exitStatus);
+            } else if (WIFSTOPPED(exitStatus)) {
+                exitStatus = WSTOPSIG(exitStatus);
+            } else {
+                exitStatus = WCOREDUMP(exitStatus);
+            }
 
             result = copyout(&exitStatus, status, sizeof(int));
             if (result) {
