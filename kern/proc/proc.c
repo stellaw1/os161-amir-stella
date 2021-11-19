@@ -67,7 +67,9 @@ struct pid *pid_table[PID_MAX];
 struct lock *pid_table_lock;
 
 
-
+/*
+ * pid entry is destoryed and the slot can be reused after
+ */
 void
 destroy_pid_entry(pid_t pidIndex)
 {
@@ -76,10 +78,14 @@ destroy_pid_entry(pid_t pidIndex)
 	if (pid_table[pidIndex] != NULL){
 		sem_destroy(pid_table[pidIndex]->exitLock);
 		kfree(pid_table[pidIndex]);
+		pid_table[pidIndex] = NULL;
 	}
 	lock_release(pid_table_lock);
 }
 
+/*
+ * update exitFlag in pid entry at pidIndex
+ */
 void
 set_pid_exitFlag(pid_t pidIndex, bool exitFlag)
 {
@@ -88,6 +94,24 @@ set_pid_exitFlag(pid_t pidIndex, bool exitFlag)
 	lock_release(pid_table_lock);
 }
 
+/*
+ * gets exitFlag in pid entry at pidIndex
+ */
+bool
+get_pid_exitFlag(pid_t pidIndex)
+{
+	lock_acquire(pid_table_lock);
+	KASSERT(pid_table[pidIndex] != NULL);
+
+	bool ret = pid_table[pidIndex]->exitFlag;
+	lock_release(pid_table_lock);
+
+	return ret;
+}
+
+/*
+ * update exitStatus in pid entry at pidIndex
+ */
 void
 set_pid_exitStatus(pid_t pidIndex, int exitStatus)
 {
@@ -96,6 +120,9 @@ set_pid_exitStatus(pid_t pidIndex, int exitStatus)
 	lock_release(pid_table_lock);
 }
 
+/*
+ * get exitStatus in pid entry at pidIndex
+ */
 int
 get_pid_exitStatus(pid_t pidIndex)
 {
@@ -108,6 +135,9 @@ get_pid_exitStatus(pid_t pidIndex)
 	return ret;
 }
 
+/*
+ * returns boolean of whether or not pidIndex is valid and has a pid entry at that index
+ */
 bool
 get_pid_in_table(pid_t pidIndex)
 {
@@ -122,18 +152,9 @@ get_pid_in_table(pid_t pidIndex)
 	return ret;
 }
 
-bool
-get_pid_has_exited(pid_t pidIndex)
-{
-	lock_acquire(pid_table_lock);
-	KASSERT(pid_table[pidIndex] != NULL);
-
-	bool ret = pid_table[pidIndex]->exitFlag;
-	lock_release(pid_table_lock);
-
-	return ret;
-}
-
+/*
+ * get parentPid in pid entry at pidIndex
+ */
 pid_t
 get_parent_pid(pid_t pidIndex)
 {
@@ -146,6 +167,9 @@ get_parent_pid(pid_t pidIndex)
 	return ret;
 }
 
+/*
+ * get exitLock in pid entry at pidIndex
+ */
 struct semaphore*
 get_exitLock(pid_t pidIndex)
 {
@@ -286,10 +310,10 @@ proc_destroy(struct proc *proc)
 	if (proc->childProcs) {
     	array_destroy(proc->childProcs);
 	}
+
 	if (proc->childProcsLock) {
     	lock_destroy(proc->childProcsLock);
 	}
-
 }
 
 /*
@@ -360,9 +384,10 @@ proc_create_runprogram(const char *name)
 		return NULL;
 	}
 
+	// grab lock and create pid entry for the new process
 	lock_acquire(pid_table_lock);
-	for (int i = PID_MIN; i < PID_MAX; i++) {
-		if (pid_table[i] == NULL) {
+	for (int i = PID_MIN; i < PID_MAX + 1; i++) {
+		if (pid_table[i] == NULL) { // found empty slot in pid table
 			pid_table[i] = kmalloc(sizeof(struct pid));
 			if (pid_table[i] == NULL) {
 				return 0;
@@ -373,9 +398,9 @@ proc_create_runprogram(const char *name)
 
 			newproc->pid = i;
 			break;
-		} else if (i == PID_MAX - 1) {
+		} else if (i == PID_MAX) { // too many processes in pid table
 			lock_release(pid_table_lock);
-			return NULL; // TODO return ENPROC
+			return NULL;
 		}
 	}
 	lock_release(pid_table_lock);

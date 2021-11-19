@@ -106,7 +106,6 @@ void set_pid_exitStatus(pid_t pidIndex, int exitStatus);
 int get_pid_exitStatus(pid_t pidIndex);
 
 bool get_pid_in_table(pid_t pidIndex);
-bool get_pid_has_exited(pid_t pidIndex);
 pid_t get_parent_pid(pid_t pidIndex);
 struct semaphore *get_exitLock(pid_t pidIndex);
 

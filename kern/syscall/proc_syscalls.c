@@ -59,6 +59,7 @@ fork(struct trapframe *tf, int *retval)
     // add child pid to array
     unsigned *index_ret = kmalloc(sizeof(unsigned));
     if (index_ret == NULL) {
+        proc_destroy(child);
         return -1;
     }
 
@@ -67,23 +68,26 @@ fork(struct trapframe *tf, int *retval)
     // copy stack
     result = as_copy(curproc->p_addrspace, &child->p_addrspace);
     if (result) {
+        proc_destroy(child);
         return result;
     }
 
-    // TODO lock oft
     child->oft = open_file_table_create();
 	if (child->oft == NULL) {
 		proc_destroy(child);
 		return ENOMEM;
 	}
+
     // copy open file table
     result = open_file_table_copy(curproc->oft, child->oft);
     if (result) {
+        proc_destroy(child);
         return result;
     }
 
     struct trapframe *tempTfCopy = kmalloc(sizeof(struct trapframe));
     if (tempTfCopy == NULL) {
+        proc_destroy(child);
         return ENOMEM;
     }
 
@@ -95,6 +99,7 @@ fork(struct trapframe *tf, int *retval)
                         tempTfCopy,
                         0);
     if (result) {
+        proc_destroy(child);
         return -1;
     }
 
@@ -131,21 +136,18 @@ fork(struct trapframe *tf, int *retval)
  */
 int waitpid(int pid, userptr_t status, int options, int *retval)
 {
-    /*
-     * error checking
-     */ 
+    // check options is 0
     if (options != 0) {
         return EINVAL;
     }
 
+    // check pid is valid and points to a proper pid entry
     if (!get_pid_in_table(pid)){
         return ESRCH;
     }
 
-    // get curproc pid
-    pid_t curpid = curproc->pid;
-
     // check that we are parent of child proc pointed to by pid
+    pid_t curpid = curproc->pid;
     if (get_parent_pid(pid) != curpid) {
         return ECHILD;
     }
@@ -154,10 +156,9 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
     int result, exitStatus;
 
     // scenario 2: child proc w pid has already exited
-    // just return exitCode
-    if (get_pid_has_exited(pid)) {
-        // set exit status and return val
-        if (status != NULL) { //TODO
+    if ( get_pid_exitFlag(pid) ) {
+        // set exit status if status is not a NULL pointer; do nothing if it's NULL
+        if (status != NULL) {
             exitStatus = get_pid_exitStatus(pid);
 
             result = copyout(&exitStatus, status, sizeof(int));
@@ -167,19 +168,17 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
             }
         }
     } 
-    else { // scenario 1: parent is blocked until child exits
-        
+    // scenario 1: parent is blocked until child exits
+    else { 
         // decrement child_lock semaphore count
         struct semaphore *exitLock = get_exitLock(pid);
-        // blocks until exit syscall is called on proc with pid entry holding lock
+        // blocks until exit syscall is called on child proc with pid entry holding lock
         P(exitLock);
 
-        // set exit status value only if status pointer is proper TODO
+        // set exit status if status is not a NULL pointer; do nothing if it's NULL
         if (status != NULL) {
-
             exitStatus = get_pid_exitStatus(pid);
 
-            // set exit status of pid process in location pointed to by status
             result = copyout(&exitStatus, status, sizeof(int));
             if (result) {
                 // EFAULT
@@ -187,7 +186,7 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
             }
         }
 
-        // get pid process and destroy
+        // get pid process and destroy it
         lock_acquire(curproc->childProcsLock);
         for (unsigned i = 0; i < curproc->childProcs->num; i++) {
             struct proc *childProc = array_get(curproc->childProcs, i);
@@ -213,11 +212,11 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
  */
 int _exit(int exitcode)
 {
-    // deal with children
+    // set parentDead flag to true for all of my children
     lock_acquire(curproc->childProcsLock);
     while (curproc->childProcs->num > 0) {
         struct proc *childProc = array_get(curproc->childProcs, 0);
-        if (get_pid_has_exited(childProc->pid)) {
+        if (get_pid_exitFlag(childProc->pid)) {
             proc_destroy(childProc);
         } else {
             childProc->parentDead = true;
@@ -229,10 +228,9 @@ int _exit(int exitcode)
     lock_release(curproc->childProcsLock);
 
 
-
     pid_t curpid = curproc->pid;
 
-    // set pid and proc exit status
+    // set pid exitFlag and proc exitStatus
     set_pid_exitFlag(curpid, true);
     set_pid_exitStatus(curpid, _MKWAIT_EXIT(exitcode));
 

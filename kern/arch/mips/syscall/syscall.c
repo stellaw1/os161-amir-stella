@@ -256,10 +256,20 @@ enter_forked_process(struct trapframe *tf)
 
 	// set return value register for child proc
     child_tf.tf_v0 = 0;
-    child_tf.tf_a3 = 0;
+    child_tf.tf_a3 = 0; // signal no error
+
+	/*
+	 * Now, advance the program counter, to avoid restarting
+	 * the syscall over and over again.
+	 */
 	child_tf.tf_epc += 4;
 
+	/*
+	 * make child proc's address space the one currently
+	 * "seen" by the processor
+	 */
 	as_activate();
 
+	// enter usermode
     mips_usermode(&child_tf);
 }
