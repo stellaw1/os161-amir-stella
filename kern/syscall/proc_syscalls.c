@@ -261,7 +261,7 @@ int execv(const char *program, char **args)
     stackptr -= (bufsize + (argc + 1) * (sizeof(char *)));
 
     for (int i = 0; i < argc + 1; i++) {
-        err = copyout(arg_locs[i], (userptr_t) stackptr, sizeof(char *));
+        err = copyout(arg_locs + i, (userptr_t) stackptr, sizeof(char *));
         if (err) {
             kfree_newas(oldas, newas);
             kfree(arg_locs);
