@@ -57,13 +57,7 @@ fork(struct trapframe *tf, int *retval)
     }
 
     // add child pid to array
-    unsigned *index_ret = kmalloc(sizeof(unsigned));
-    if (index_ret == NULL) {
-        proc_destroy(child);
-        return -1;
-    }
-
-    array_add(curproc->childProcs, child, index_ret);
+    array_add(curproc->childProcs, child, NULL);
 
     // copy stack
     result = as_copy(curproc->p_addrspace, &child->p_addrspace);
@@ -87,6 +81,7 @@ fork(struct trapframe *tf, int *retval)
 
     struct trapframe *tempTfCopy = kmalloc(sizeof(struct trapframe));
     if (tempTfCopy == NULL) {
+        kfree(tempTfCopy);
         proc_destroy(child);
         return ENOMEM;
     }
