@@ -16,7 +16,7 @@ int _exit(int exitcode);
 int getpid(int *retval);
 
 // helper functions
-void kfree_buf(char **buf);
+void kfree_buf(char **buf, int len);
 void kfree_newas(struct addrspace *oldas, struct addrspace *newas);
 int get_arglen(int arglen);
 

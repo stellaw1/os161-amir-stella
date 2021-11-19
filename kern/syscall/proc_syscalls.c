@@ -106,8 +106,8 @@ fork(struct trapframe *tf, int *retval)
 
 // free copied argument buffer
 void
-kfree_buf(char **buf) {
-    for (int i = 0; buf[i] != NULL; i++) {
+kfree_buf(char **buf, int len) {
+    for (int i = 0; i < len; i++) {
         kfree(buf[i]);
     }
     kfree(buf);
@@ -139,10 +139,17 @@ get_arglen(int arglen) {
  *              returns 0 in the child process
  */
 int execv(const char *program, char **args)
-{
+{   
     int argc;
     int err = 0;
     char **arg_pointer = kmalloc(sizeof(char*));
+    
+    err = copyin((userptr_t) args, arg_pointer, sizeof(char**));
+    if (err) {
+        kfree(arg_pointer);
+        return err;
+    }
+    
     for (argc = 0; argc <= ARG_MAX && args[argc] != NULL; argc++);
 
     if (argc > ARG_MAX) {
@@ -158,41 +165,58 @@ int execv(const char *program, char **args)
     }
 
     int bufsize = 0;
+    
+    char *arg_test = kmalloc(sizeof(char) * ARG_MAX);
+    if (arg_test == NULL) {
+        kfree(arg_pointer);
+        kfree(argsbuf);
+        return ENOMEM;
+    }
 
     for (int i = 0; i < argc; i++) {
         // copy in pointer to argument string for security
-        err = copyin((userptr_t) &args[i], arg_pointer, sizeof(char*));
+        err = copyin((userptr_t) args + i * sizeof(char *), arg_pointer, sizeof(char*));
         if (err) {
             kfree(arg_pointer);
             kfree(argsbuf);
+            return err;
+        }
+        err = copyinstr((userptr_t) args[i], arg_test, sizeof(char) * ARG_MAX, NULL);
+        if (err) {
+            kfree(arg_pointer);
+            kfree(argsbuf);
+            kfree(arg_test);
             return err;
         }
         int arglen = strlen(args[i]) + 1;
         argsbuf[i] = kmalloc(sizeof(char) * arglen);
         if (argsbuf[i] == NULL) {
             kfree(arg_pointer);
-            kfree_buf(argsbuf);
+            kfree_buf(argsbuf, i-1);
+            kfree(arg_test);
             return ENOMEM;
         } 
         err = copyinstr((userptr_t) args[i], argsbuf[i], sizeof(char) * arglen, NULL);
         if (err) {
             kfree(arg_pointer);
-            kfree_buf(argsbuf);
+            kfree_buf(argsbuf, i);
+            kfree(arg_test);
             return err;
         }
         bufsize += get_arglen(arglen);
     }
 
+    kfree(arg_test);
     kfree(arg_pointer);
 
-    char *progname = kmalloc(strlen(program) + 1);
+    char *progname = kmalloc(PATH_MAX);
     if (progname == NULL) {
-        kfree_buf(argsbuf);
+        kfree_buf(argsbuf, argc);
         return ENOMEM;
     }
-    err = copyinstr((userptr_t) program, progname, strlen(program) + 1, NULL);
+    err = copyinstr((userptr_t) program, progname, PATH_MAX, NULL);
     if (err) {
-        kfree_buf(argsbuf);
+        kfree_buf(argsbuf, argc);
         kfree(progname);
         return err;
     }
@@ -200,7 +224,7 @@ int execv(const char *program, char **args)
     struct vnode *prog_vn;
     err = vfs_open(progname, O_RDONLY, 0, &prog_vn);
     if (err) {
-        kfree_buf(argsbuf);
+        kfree_buf(argsbuf, argc);
         kfree(progname);
         return err;
     }
@@ -208,7 +232,7 @@ int execv(const char *program, char **args)
 
     struct addrspace *newas = as_create();
     if (newas == NULL) {
-        kfree_buf(argsbuf);
+        kfree_buf(argsbuf, argc);
         return ENOMEM;
     }
 
@@ -219,7 +243,7 @@ int execv(const char *program, char **args)
 
     err = load_elf(prog_vn, &entrypoint);
     if (err) {
-        kfree_buf(argsbuf);
+        kfree_buf(argsbuf, argc);
         kfree_newas(oldas, newas);
         return err;
     }
@@ -227,7 +251,7 @@ int execv(const char *program, char **args)
     vaddr_t stackptr;
     err = as_define_stack(newas, &stackptr);
     if (err) {
-        kfree_buf(argsbuf);
+        kfree_buf(argsbuf, argc);
         kfree_newas(oldas, newas);
         return err;
     }
@@ -235,7 +259,7 @@ int execv(const char *program, char **args)
     // create array for storing argument locations in user stack
     char **arg_locs = kmalloc(sizeof(char *) * (argc + 1));
     if (arg_locs == NULL) {
-        kfree_buf(argsbuf);
+        kfree_buf(argsbuf, argc);
         kfree_newas(oldas, newas);
         return ENOMEM;
     }
@@ -245,7 +269,7 @@ int execv(const char *program, char **args)
         int arglen = strlen(argsbuf[i]) + 1;
         err = copyoutstr(argsbuf[i], (userptr_t) stackptr, arglen, NULL);
         if (err) {
-            kfree_buf(argsbuf);
+            kfree_buf(argsbuf, argc);
             kfree_newas(oldas, newas);
             kfree(arg_locs);
             return err;
@@ -256,7 +280,7 @@ int execv(const char *program, char **args)
 
     arg_locs[argc] = 0;
 
-    kfree_buf(argsbuf);
+    kfree_buf(argsbuf, argc);
 
     stackptr -= (bufsize + (argc + 1) * (sizeof(char *)));
 
