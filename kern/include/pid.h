@@ -6,15 +6,16 @@
 #include <limits.h>
 
 /*
- * Structure representing a pid entry in the pid table
+ * Structure representing a pid entry in the pid table; associated with one process
  */
 struct pid
 {
-	pid_t parentPid;
-	struct semaphore *exitLock;
 
-	bool exitFlag;
-	int exitStatus;
+	pid_t parentPid;				/* pid of the parent of associated process */
+	struct semaphore *exitLock;		/* lock used to signal to blocking parent that associated process has exited */
+
+	bool exitFlag;					/* associated process has exited */
+	int exitStatus;					/* exitCode called on associated process to exit */
 };
 
 

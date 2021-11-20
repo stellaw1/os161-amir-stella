@@ -43,6 +43,7 @@
 #include <kern/iovec.h>
 #include <endian.h>
 #include <addrspace.h>
+#include <kern/wait.h>
 
 
 /*
@@ -184,7 +185,7 @@ syscall(struct trapframe *tf)
 		case SYS_fork:
 		err = fork(tf, &retval);
 		break;
-		
+
 		case SYS_execv:
 		err = execv((const char *) tf->tf_a0, (char **) tf->tf_a1);
 		break;
@@ -194,7 +195,7 @@ syscall(struct trapframe *tf)
 		break;
 
 		case SYS__exit:
-		err = _exit(tf->tf_a0);
+		err = _exit(_MKWAIT_EXIT(tf->tf_a0));
 		break;
 
 		case SYS_getpid:

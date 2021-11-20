@@ -340,16 +340,6 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
         if (status != NULL) {
             exitStatus = get_pid_exitStatus(pid);
 
-            if (WIFEXITED(exitStatus)) {
-                exitStatus = WEXITSTATUS(exitStatus);
-            } else if (WIFSIGNALED(exitStatus)) {
-                exitStatus = WTERMSIG(exitStatus);
-            } else if (WIFSTOPPED(exitStatus)) {
-                exitStatus = WSTOPSIG(exitStatus);
-            } else {
-                exitStatus = WCOREDUMP(exitStatus);
-            }
-
             result = copyout(&exitStatus, status, sizeof(int));
             if (result) {
                 // EFAULT
@@ -367,16 +357,6 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
         // set exit status if status is not a NULL pointer; do nothing if it's NULL
         if (status != NULL) {
             exitStatus = get_pid_exitStatus(pid);
-
-            if (WIFEXITED(exitStatus)) {
-                exitStatus = WEXITSTATUS(exitStatus);
-            } else if (WIFSIGNALED(exitStatus)) {
-                exitStatus = WTERMSIG(exitStatus);
-            } else if (WIFSTOPPED(exitStatus)) {
-                exitStatus = WSTOPSIG(exitStatus);
-            } else {
-                exitStatus = WCOREDUMP(exitStatus);
-            }
 
             result = copyout(&exitStatus, status, sizeof(int));
             if (result) {
@@ -431,7 +411,7 @@ int _exit(int exitcode)
 
     // set pid exitFlag and proc exitStatus
     set_pid_exitFlag(curpid, true);
-    set_pid_exitStatus(curpid, _MKWAIT_EXIT(exitcode));
+    set_pid_exitStatus(curpid, exitcode);
 
     //increment child_lock semaphore count to unblock parent thread waiting on this thread to exit (if any)
     struct semaphore *exitLock = get_exitLock(curpid);
