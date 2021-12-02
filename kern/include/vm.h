@@ -38,7 +38,6 @@
 
 
 #include <machine/vm.h>
-#include <addrspace.h>
 
 /* Fault-type arguments to vm_fault() */
 #define VM_FAULT_READ        0    /* A read was attempted */
@@ -59,20 +58,6 @@ void free_kpages(vaddr_t addr);
 /* TLB shootdown handling called from interprocessor_interrupt */
 void vm_tlbshootdown_all(void);
 void vm_tlbshootdown(const struct tlbshootdown *);
-
-
-/*
- * Definitions for myvm
- */
-struct coremap_entry {
-	vaddr_t virtual_addr; // virtual page number; might need to make this an array to store myltiple virtual addresses
-	struct addrspace *mapped_space;
-
-	// flags
-	bool busyFlag;
-};
-
-struct coremap_entry *coremap;
 
 
 #endif /* _VM_H_ */
