@@ -68,9 +68,9 @@ vm_bootstrap(void)
 	paddr_t firstpaddr = ram_getfirstfree();
 
 	paddr_t firstpaddr_offset = firstpaddr % PAGE_SIZE;
-	paddr_t firstpaddr_aligned = firstpaddr + PAGE_SIZE - firstpaddr_offset;
+	coremap_addr = firstpaddr + PAGE_SIZE - firstpaddr_offset;
 
-	coremap = (struct coremap_entry*) PADDR_TO_KVADDR(firstpaddr_aligned);
+	coremap = (struct coremap_entry*) PADDR_TO_KVADDR(coremap_addr);
 
 	totalpages = ( (lastpaddr - firstpaddr) / PAGE_SIZE ) + 1; // + 1 to round up
 	int coremap_size = totalpages * sizeof(struct coremap_entry);
@@ -78,13 +78,13 @@ vm_bootstrap(void)
 
 	for (int i = 0; i < coremap_pages; i++) {
 		coremap[i].busyFlag = true;
-		coremap[i].address = firstpaddr_aligned + (i * PAGE_SIZE);
 	}
 
 	for (int i = coremap_pages; i < totalpages; i++) {
 		coremap[i].busyFlag = false;
-		coremap[i].address = firstpaddr_aligned + (i * PAGE_SIZE);
 	}
+
+	coremap_initialized = true;
 }
 
 
@@ -98,43 +98,59 @@ int vm_fault(int faulttype, vaddr_t faultaddress) {
 
 /* Allocate/free kernel heap pages (called by kmalloc/kfree) */
 vaddr_t alloc_kpages(unsigned npages) {
-	paddr_t start_addr;
+	paddr_t addr;
 
-	spinlock_acquire(&coremap_lock);
+	if (coremap_initialized) {
+		spinlock_acquire(&coremap_lock);
 
-	int alloced = 0;
-	int start = -1;
+		int alloced = 0;
+		int start = -1;
 
-	for (int i = 0; i < totalpages || alloced == (int) npages; i++) {
-		if (!coremap[i].busyFlag && start == -1) {
-			alloced++;
-			start = i;
-		} else if (!coremap[i].busyFlag) {
-			alloced++;
-		} else {
-			alloced = 0;
-			start = -1;
+		for (int i = 0; i < totalpages; i++) {
+			if (!coremap[i].busyFlag && start == -1) {
+				alloced++;
+				start = i;
+			} else if (!coremap[i].busyFlag) {
+				alloced++;
+			} else {
+				alloced = 0;
+				start = -1;
+			}
+
+			if (alloced == (int) npages) {
+				break;
+			}
 		}
-	}
 
-	if (alloced < (int) npages) {
+		if (alloced < (int) npages) {
+			spinlock_release(&coremap_lock);
+			return 0;
+		}
+
+		addr = coremap_addr + (start * PAGE_SIZE);
+		as_zero_region(addr, npages);
+
+		vaddr_t ret = PADDR_TO_KVADDR(addr);
+		coremap[start].numpages = npages;
+		coremap[start].virtual_addr = ret;
+
+		for (int i = 0; i < (int) npages; i++) {
+			coremap[i + start].busyFlag = true;
+		}
+
 		spinlock_release(&coremap_lock);
-		return 0;
+		return ret;
+	} else {
+		spinlock_acquire(&coremap_lock);
+
+		addr = ram_stealmem(npages);
+
+		spinlock_release(&coremap_lock);
+		if (addr == 0) {
+			return 0;
+		}
+		return PADDR_TO_KVADDR(addr);
 	}
-
-	start_addr = coremap[start].address;
-	as_zero_region(start_addr, npages);
-
-	vaddr_t ret = PADDR_TO_KVADDR(start_addr);
-	coremap[start].numpages = npages;
-	coremap[start].virtual_addr = ret;
-
-	for (int i = 0; i < (int) npages; i++) {
-		coremap[i + start].busyFlag = true;
-	}
-
-	spinlock_release(&coremap_lock);
-	return ret;
 }
 
 void
