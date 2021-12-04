@@ -64,69 +64,106 @@
 void
 vm_bootstrap(void)
 {
-	paddr_t firstpaddr = ram_getfirstfree();
 	paddr_t lastpaddr = ram_getsize();
+	paddr_t firstpaddr = ram_getfirstfree();
 
 	paddr_t firstpaddr_offset = firstpaddr % PAGE_SIZE;
 	paddr_t firstpaddr_aligned = firstpaddr + PAGE_SIZE - firstpaddr_offset;
 
-	coremap = (void *) PADDR_TO_KVADDR(firstpaddr_aligned);// do i need to kmalloc coremap[i] here ?
+	coremap = (struct coremap_entry*) PADDR_TO_KVADDR(firstpaddr_aligned);
 
-	numpages = ( (lastpaddr - firstpaddr) / PAGE_SIZE ) + 1; // + 1 to round up
-	int coremap_size = numpages * sizeof(struct coremap_entry);
+	totalpages = ( (lastpaddr - firstpaddr) / PAGE_SIZE ) + 1; // + 1 to round up
+	int coremap_size = totalpages * sizeof(struct coremap_entry);
 	int coremap_pages = ( coremap_size / PAGE_SIZE ) + 1; // + 1 to round up
 
 	for (int i = 0; i < coremap_pages; i++) {
-		// do i need to kmalloc coremap[i] here ?
 		coremap[i].busyFlag = true;
 		coremap[i].address = firstpaddr_aligned + (i * PAGE_SIZE);
 	}
 
-	for (int i = coremap_pages; i < numpages; i++) {
+	for (int i = coremap_pages; i < totalpages; i++) {
 		coremap[i].busyFlag = false;
 		coremap[i].address = firstpaddr_aligned + (i * PAGE_SIZE);
 	}
 }
 
-static
-paddr_t
-getFreePage()
-{
-	paddr_t addr;
-
-	spinlock_acquire(&coremap_lock);
-
-	for (int i = 0; i < numpages; i++) {
-		if (!coremap[i].busyFlag) {
-			coremap[i].busyFlag = true;
-			addr = coremap[i].address;
-			as_zero_region(addr, 1);
-			spinlock_release(&coremap_lock);
-			return addr;
-		}
-	}
-	spinlock_release(&coremap_lock);
-	return 0;
-}
-
 
 /* Fault handling function called by trap code */
 int vm_fault(int faulttype, vaddr_t faultaddress) {
+	(void) faulttype;
+	(void) faultaddress;
 
+	return 0;
 }
 
 /* Allocate/free kernel heap pages (called by kmalloc/kfree) */
 vaddr_t alloc_kpages(unsigned npages) {
+	paddr_t start_addr;
 
+	spinlock_acquire(&coremap_lock);
+
+	int alloced = 0;
+	int start = -1;
+
+	for (int i = 0; i < totalpages || alloced == (int) npages; i++) {
+		if (!coremap[i].busyFlag && start == -1) {
+			alloced++;
+			start = i;
+		} else if (!coremap[i].busyFlag) {
+			alloced++;
+		} else {
+			alloced = 0;
+			start = -1;
+		}
+	}
+
+	if (alloced < (int) npages) {
+		spinlock_release(&coremap_lock);
+		return 0;
+	}
+
+	start_addr = coremap[start].address;
+	as_zero_region(start_addr, npages);
+
+	vaddr_t ret = PADDR_TO_KVADDR(start_addr);
+	coremap[start].numpages = npages;
+	coremap[start].virtual_addr = ret;
+
+	for (int i = 0; i < (int) npages; i++) {
+		coremap[i + start].busyFlag = true;
+	}
+
+	spinlock_release(&coremap_lock);
+	return ret;
 }
-void free_kpages(vaddr_t addr) {
 
+void
+free_kpages(vaddr_t addr)
+{
+	spinlock_acquire(&coremap_lock);
+	for (int i = 0; i < totalpages; i++) {
+		if (coremap[i].virtual_addr == addr) {
+			int numpages = coremap[i].numpages;
+			for (int j = 0; j < numpages; j++) {
+				coremap[i + j].busyFlag = false;
+			}
+			break;
+		}
+	}
+	spinlock_release(&coremap_lock);
+}
+
+
+void
+as_zero_region(paddr_t paddr, unsigned npages)
+{
+	bzero((void *)PADDR_TO_KVADDR(paddr), npages * PAGE_SIZE);
 }
 
 /* TLB shootdown handling called from interprocessor_interrupt */
 void vm_tlbshootdown_all(void) {
 
 }
-void vm_tlbshootdown(const struct tlbshootdown *) {
-
+void vm_tlbshootdown(const struct tlbshootdown *ts) {
+	(void) ts;
 }
