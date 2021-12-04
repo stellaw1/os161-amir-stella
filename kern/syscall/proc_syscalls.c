@@ -40,7 +40,8 @@ void help_enter_forked_process(void *ptr, unsigned long nargs)
  *
  * tf:          trapframe of parent process
  *
- * returns:     returns the process id of the new child process in the parent process;
+ * returns:     returns the process id of the new child process in the parent
+ *              process
  *              returns 0 in the child process
  */
 int
@@ -104,24 +105,36 @@ fork(struct trapframe *tf, int *retval)
     return 0;
 }
 
-// free copied argument buffer
+/*
+ * helper function for freeing the kernel argument buffer
+ */
 void
-kfree_buf(char **buf, int len) {
+kfree_buf(char **buf, int len)
+{
     for (int i = 0; i < len; i++) {
         kfree(buf[i]);
     }
     kfree(buf);
 }
 
+/*
+ * helper function for freeing the newly creating address space
+ * and setting the current address space to the old one
+ */
 void
-kfree_newas(struct addrspace *oldas, struct addrspace *newas) {
+kfree_newas(struct addrspace *oldas, struct addrspace *newas)
+{
     proc_setas(oldas);
     as_activate();
     as_destroy(newas);
 }
 
+/*
+ * helper function to get the properly aligned argument size
+ */
 int
-get_arglen(int arglen) {
+get_arglen(int arglen)
+{
     if (arglen % 4 == 0) {
         return arglen;
     }
@@ -135,7 +148,8 @@ get_arglen(int arglen) {
  * program:     path name of program to replace current program with
  * args:        array of 0 terminated strings; array terminated by NULL pointer
  *
- * returns:     returns the process id of the new child process in the parent process;
+ * returns:     returns the process id of the new child process in the parent 
+ *              process;
  *              returns 0 in the child process
  */
 int execv(const char *program, char **args)
@@ -144,12 +158,14 @@ int execv(const char *program, char **args)
     int err = 0;
     char **arg_pointer = kmalloc(sizeof(char*));
 
+    // copyin the args array to ensure it is a valid pointer
     err = copyin((userptr_t) args, arg_pointer, sizeof(char**));
     if (err) {
         kfree(arg_pointer);
         return err;
     }
 
+    // loop through the args array to get the number of arguments (argc)
     for (argc = 0; argc <= ARG_MAX && args[argc] != NULL; argc++);
 
     if (argc > ARG_MAX) {
@@ -174,20 +190,26 @@ int execv(const char *program, char **args)
     }
 
     for (int i = 0; i < argc; i++) {
-        // copy in pointer to argument string for security
-        err = copyin((userptr_t) args + i * sizeof(char *), arg_pointer, sizeof(char*));
+        // copy in pointer to argument string to ensure it is valid
+        err = copyin((userptr_t) args + i * sizeof(char *), arg_pointer,
+            sizeof(char*));
         if (err) {
             kfree(arg_pointer);
             kfree(argsbuf);
             return err;
         }
-        err = copyinstr((userptr_t) args[i], arg_test, sizeof(char) * ARG_MAX, NULL);
+        
+        // copy in argument string before getting string length to 
+        // ensure it is valid
+        err = copyinstr((userptr_t) args[i], arg_test, sizeof(char) * ARG_MAX,
+            NULL);
         if (err) {
             kfree(arg_pointer);
             kfree(argsbuf);
             kfree(arg_test);
             return err;
         }
+        
         int arglen = strlen(args[i]) + 1;
         argsbuf[i] = kmalloc(sizeof(char) * arglen);
         if (argsbuf[i] == NULL) {
@@ -196,19 +218,25 @@ int execv(const char *program, char **args)
             kfree(arg_test);
             return ENOMEM;
         }
-        err = copyinstr((userptr_t) args[i], argsbuf[i], sizeof(char) * arglen, NULL);
+        
+        // copy argument string into kernel buffer
+        err = copyinstr((userptr_t) args[i], argsbuf[i], sizeof(char) * arglen,
+            NULL);
         if (err) {
             kfree(arg_pointer);
             kfree_buf(argsbuf, i);
             kfree(arg_test);
             return err;
         }
+        
+        // increase buffer size by aligned argument length
         bufsize += get_arglen(arglen);
     }
 
     kfree(arg_test);
     kfree(arg_pointer);
 
+    // copy in program name into kernel space
     char *progname = kmalloc(PATH_MAX);
     if (progname == NULL) {
         kfree_buf(argsbuf, argc);
@@ -221,6 +249,7 @@ int execv(const char *program, char **args)
         return err;
     }
 
+    // open program executable for use by load_elf
     struct vnode *prog_vn;
     err = vfs_open(progname, O_RDONLY, 0, &prog_vn);
     if (err) {
@@ -230,17 +259,19 @@ int execv(const char *program, char **args)
     }
     kfree(progname);
 
+    // create new address space and set process address space to the newly
+    // created address space
     struct addrspace *newas = as_create();
     if (newas == NULL) {
         kfree_buf(argsbuf, argc);
         return ENOMEM;
     }
-
     struct addrspace *oldas = proc_setas(newas);
     as_activate();
 
     vaddr_t entrypoint;
 
+    // load executable file
     err = load_elf(prog_vn, &entrypoint);
     if (err) {
         kfree_buf(argsbuf, argc);
@@ -264,8 +295,11 @@ int execv(const char *program, char **args)
         return ENOMEM;
     }
 
+    // decrement stack pointer by size of argument buffer to place
+    // arguments at top of new user stack
     stackptr -= bufsize;
     for (int i = 0; i < argc; i++) {
+        // copy argument string onto user stack from kernel buffer
         int arglen = strlen(argsbuf[i]) + 1;
         err = copyoutstr(argsbuf[i], (userptr_t) stackptr, arglen, NULL);
         if (err) {
@@ -274,14 +308,21 @@ int execv(const char *program, char **args)
             kfree(arg_locs);
             return err;
         }
+        
+        // store address of current argument
         arg_locs[i] = (char *) stackptr;
+
+        // leave extra padding so each argument is aligned to 4 bytes
         stackptr += get_arglen(arglen);
     }
 
+    // set a null pointer at end of argument pointers array to signify end
     arg_locs[argc] = 0;
 
     kfree_buf(argsbuf, argc);
 
+    // decrement stack pointer to place argument pointers on top of arguments
+    // in user stack
     stackptr -= (bufsize + (argc + 1) * (sizeof(char *)));
 
     for (int i = 0; i < argc + 1; i++) {
@@ -294,6 +335,7 @@ int execv(const char *program, char **args)
         stackptr += sizeof(char *);
     }
 
+    // set the stack pointer to the new top of the stack
     kfree(arg_locs);
     stackptr -= (argc + 1) * (sizeof(char *));
 
@@ -336,7 +378,8 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
 
     // scenario 2: child proc w pid has already exited
     if ( get_pid_exitFlag(pid) ) {
-        // set exit status if status is not a NULL pointer; do nothing if it's NULL
+        // set exit status if status is not a NULL pointer; do nothing if it's
+        // NULL
         if (status != NULL) {
             exitStatus = get_pid_exitStatus(pid);
 
@@ -351,10 +394,12 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
     else {
         // decrement child_lock semaphore count
         struct semaphore *exitLock = get_exitLock(pid);
-        // blocks until exit syscall is called on child proc with pid entry holding lock
+        // blocks until exit syscall is called on child proc with pid entry 
+        // holding lock
         P(exitLock);
 
-        // set exit status if status is not a NULL pointer; do nothing if it's NULL
+        // set exit status if status is not a NULL pointer; do nothing if it's
+        // NULL
         if (status != NULL) {
             exitStatus = get_pid_exitStatus(pid);
 
@@ -387,7 +432,8 @@ int waitpid(int pid, userptr_t status, int options, int *retval)
  * terminate current process
  * ------------
  *
- * exitcode:    7 bit wide value that is reported to other processes bia waitpid()
+ * exitcode:    7 bit wide value that is reported to other processes via
+ *              waitpid()
  */
 int _exit(int exitcode)
 {
@@ -413,7 +459,8 @@ int _exit(int exitcode)
     set_pid_exitFlag(curpid, true);
     set_pid_exitStatus(curpid, exitcode);
 
-    //increment child_lock semaphore count to unblock parent thread waiting on this thread to exit (if any)
+    // increment child_lock semaphore count to unblock parent thread waiting on
+    // this thread to exit (if any)
     struct semaphore *exitLock = get_exitLock(curpid);
     V(exitLock);
 
