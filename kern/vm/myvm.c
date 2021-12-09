@@ -40,27 +40,15 @@
 #include <coremap.h>
 
 /*
- * Dumb MIPS-only "VM system" that is intended to only be just barely
- * enough to struggle off the ground. You should replace all of this
- * code while doing the VM assignment. In fact, starting in that
- * assignment, this file is not included in your kernel!
- *
- * NOTE: it's been found over the years that students often begin on
- * the VM assignment by copying dumbvm.c and trying to improve it.
- * This is not recommended. dumbvm is (more or less intentionally) not
- * a good design reference. The first recommendation would be: do not
- * look at dumbvm at all. The second recommendation would be: if you
- * do, be sure to review it from the perspective of comparing it to
- * what a VM system is supposed to do, and understanding what corners
- * it's cutting (there are many) and why, and more importantly, how.
+ * Smarter implementation of VM
  */
 
-/* under dumbvm, always have 72k of user stack */
-/* (this must be > 64K so argument blocks of size ARG_MAX will fit) */
-#define DUMBVM_STACKPAGES   18
 #define PAGE_SIZE    		4096
 
 
+/*
+ * Generates a new open file entry
+ */
 void
 vm_bootstrap(void)
 {
@@ -88,7 +76,9 @@ vm_bootstrap(void)
 }
 
 
-/* Fault handling function called by trap code */
+/* 
+ * Fault handling function called by trap code 
+ */
 int vm_fault(int faulttype, vaddr_t faultaddress) {
 	(void) faulttype;
 	(void) faultaddress;
@@ -96,7 +86,10 @@ int vm_fault(int faulttype, vaddr_t faultaddress) {
 	return 0;
 }
 
-/* Allocate/free kernel heap pages (called by kmalloc/kfree) */
+
+/* 
+ * Allocate/free kernel heap pages (called by kmalloc/kfree) 
+ */
 vaddr_t alloc_kpages(unsigned npages) {
 	paddr_t addr;
 
@@ -153,6 +146,10 @@ vaddr_t alloc_kpages(unsigned npages) {
 	}
 }
 
+
+/*
+ * frees the pages in the segment specified by the virtual address, addr
+ */
 void
 free_kpages(vaddr_t addr)
 {
@@ -170,16 +167,18 @@ free_kpages(vaddr_t addr)
 }
 
 
+/*
+ * helper function that initializes npages pages of memory starting at paddr
+ */
 void
 as_zero_region(paddr_t paddr, unsigned npages)
 {
 	bzero((void *)PADDR_TO_KVADDR(paddr), npages * PAGE_SIZE);
 }
 
-/* TLB shootdown handling called from interprocessor_interrupt */
-void vm_tlbshootdown_all(void) {
 
-}
+/* TLB shootdown handling called from interprocessor_interrupt */
+void vm_tlbshootdown_all(void) {}
 void vm_tlbshootdown(const struct tlbshootdown *ts) {
 	(void) ts;
 }
