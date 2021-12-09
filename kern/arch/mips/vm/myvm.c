@@ -46,6 +46,103 @@
 #define PAGE_SIZE    		4096
 
 
+
+/*
+ * Helper functions
+ *********************/
+
+
+/* 
+ * helper function for allocating kernel pages after coremap has been initialized
+ */
+static vaddr_t post_vm_init_alloc(unsigned npages) {
+	paddr_t addr;
+
+	spinlock_acquire(&coremap_lock);
+
+	int alloced = 0;
+	int start = -1;
+
+	// iterate through coremap until npages of consecutive free pages have been found
+	for (int i = 0; i < totalpages; i++) {
+		if (!coremap[i].busyFlag && start == -1) {
+			alloced++;
+			start = i;
+		} else if (!coremap[i].busyFlag) {
+			alloced++;
+		} else {
+			alloced = 0;
+			start = -1;
+		}
+
+		// if enough consecutive free pages have been found, break out of loop
+		if (alloced == (int) npages) {
+			break;
+		}
+	}
+
+	// return 0 if coremap is full
+	if (alloced < (int) npages) {
+		spinlock_release(&coremap_lock);
+		return 0;
+	}
+
+	// set return address to physical address of first page in consecutive segment
+	addr = coremap_addr + (start * PAGE_SIZE);
+	// initialize the segment
+	as_zero_region(addr, npages);
+
+	// translate physical return address to a virtual address
+	vaddr_t ret = PADDR_TO_KVADDR(addr);
+
+	// set properties in coremap to indicate pages as busy
+	coremap[start].segment_pages = npages;
+	coremap[start].virtual_addr = ret;
+
+	for (int i = 0; i < (int) npages; i++) {
+		coremap[i + start].busyFlag = true;
+	}
+
+	spinlock_release(&coremap_lock);
+
+	return ret;
+}
+
+/* 
+ * helper function for allocating kernel pages before coremap has been initialized
+ */
+static vaddr_t pre_vm_init_alloc(unsigned npages) {
+	paddr_t addr;
+
+	spinlock_acquire(&coremap_lock);
+
+	addr = ram_stealmem(npages);
+
+	spinlock_release(&coremap_lock);
+	if (addr == 0) {
+		return 0;
+	}
+
+	return PADDR_TO_KVADDR(addr);
+}
+
+/*
+ * helper function that initializes npages pages of memory starting at paddr
+ */
+void
+as_zero_region(paddr_t paddr, unsigned npages)
+{
+	bzero((void *)PADDR_TO_KVADDR(paddr), npages * PAGE_SIZE);
+}
+
+
+
+
+
+/*
+ * VM functions
+ ******************/
+
 /*
  * Generates a new open file entry
  */
@@ -75,7 +172,6 @@ vm_bootstrap(void)
 	coremap_initialized = true;
 }
 
-
 /* 
  * Fault handling function called by trap code 
  */
@@ -86,66 +182,22 @@ int vm_fault(int faulttype, vaddr_t faultaddress) {
 	return 0;
 }
 
-
 /* 
- * Allocate/free kernel heap pages (called by kmalloc/kfree) 
+ * Allocates npages consecutive kernel pages and marks them in the global coremap if initialized
  */
 vaddr_t alloc_kpages(unsigned npages) {
-	paddr_t addr;
 
 	if (coremap_initialized) {
-		spinlock_acquire(&coremap_lock);
-
-		int alloced = 0;
-		int start = -1;
-
-		for (int i = 0; i < totalpages; i++) {
-			if (!coremap[i].busyFlag && start == -1) {
-				alloced++;
-				start = i;
-			} else if (!coremap[i].busyFlag) {
-				alloced++;
-			} else {
-				alloced = 0;
-				start = -1;
-			}
-
-			if (alloced == (int) npages) {
-				break;
-			}
-		}
-
-		if (alloced < (int) npages) {
-			spinlock_release(&coremap_lock);
-			return 0;
-		}
-
-		addr = coremap_addr + (start * PAGE_SIZE);
-		as_zero_region(addr, npages);
-
-		vaddr_t ret = PADDR_TO_KVADDR(addr);
-		coremap[start].numpages = npages;
-		coremap[start].virtual_addr = ret;
-
-		for (int i = 0; i < (int) npages; i++) {
-			coremap[i + start].busyFlag = true;
-		}
-
-		spinlock_release(&coremap_lock);
-		return ret;
+		// if coremap has been initialized, call the coremap version of allocating memory
+		return post_vm_init_alloc(npages);
 	} else {
-		spinlock_acquire(&coremap_lock);
-
-		addr = ram_stealmem(npages);
-
-		spinlock_release(&coremap_lock);
-		if (addr == 0) {
-			return 0;
-		}
-		return PADDR_TO_KVADDR(addr);
+		// if coremap has NOT been initialized, call the stealmem version of allocating memory
+		return pre_vm_init_alloc(npages);
 	}
-}
 
+	// code should never reach here
+	return 0;
+}
 
 /*
  * frees the pages in the segment specified by the virtual address, addr
@@ -154,26 +206,20 @@ void
 free_kpages(vaddr_t addr)
 {
 	spinlock_acquire(&coremap_lock);
+
+	// iterate through coremap to find page with the virtual address addr
+	// if none found, do nothing indicating that page has already been freed/ was never allocated
 	for (int i = 0; i < totalpages; i++) {
 		if (coremap[i].virtual_addr == addr) {
-			int numpages = coremap[i].numpages;
-			for (int j = 0; j < numpages; j++) {
+			// iterate through the next segment_pages of entries in the coremap to free the entire segment
+			int segment_pages = coremap[i].segment_pages;
+			for (int j = 0; j < segment_pages; j++) {
 				coremap[i + j].busyFlag = false;
 			}
 			break;
 		}
 	}
 	spinlock_release(&coremap_lock);
-}
-
-
-/*
- * helper function that initializes npages pages of memory starting at paddr
- */
-void
-as_zero_region(paddr_t paddr, unsigned npages)
-{
-	bzero((void *)PADDR_TO_KVADDR(paddr), npages * PAGE_SIZE);
 }
 
 

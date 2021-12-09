@@ -20,7 +20,7 @@ int totalpages;							/* number of entries in coremap */
  */
 struct coremap_entry {
 	vaddr_t virtual_addr; 				/* virtual page number; might need to make this an array to store myltiple virtual addresses */
-	int numpages;						/* number of consecutive pages allocated to this segment */
+	int segment_pages;						/* number of consecutive pages allocated to this segment */
 
 	bool busyFlag;						/* true if this page has been allocated, false if not */
 };
