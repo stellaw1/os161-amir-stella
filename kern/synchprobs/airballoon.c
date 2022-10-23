@@ -1,6 +1,107 @@
 /*
- * Driver code for airballoon problem
+ * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
+ *	The President and Fellows of Harvard College.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE UNIVERSITY OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
+
+/*
+ * SYNCHRONIZATION PROBLEM 2: AIR BALLOON
+ *
+ * After a war erupts in their kingdom, Princess Marigold must help
+ * Prince Dandelion (her younger brother) escape from danger. Marigold places
+ * Dandelion in a hot air balloon, which is connected to the ground by
+ * NROPES ropes -- each rope is connected to a hook on the balloon as well as
+ * a stake in the ground. Marigold and Dandelion must work together to sever all
+ * of these ropes so that Dandelion can escape. Marigold unties the ropes from
+ * the ground stakes while Dandelion unhooks the ropes from the balloon.
+ *
+ * Unfortunately, one of Princess Marigold and Prince Dandelion's enemies,
+ * Lord FlowerKiller, is also at work. FlowerKiller is rearranging the ropes
+ * to thwart Princess Marigold and Prince Dandelion. He will randomly unhook
+ * a rope from one stake and move it to another stake. This leads to chaos!
+ *
+ * Without Lord FlowerKiller's dastardly, behavior, there would be a simple
+ * 1:1 correspondence between balloon_hooks and ground_stakes (each hook in
+ * balloon_hooks has exactly one corresponding entry in ground_stakes, and
+ * each stake in ground_stakes has exactly one corresponding entry in
+ * balloon_hooks). However, while Lord FlowerKiller is around, this perfect
+ * 1:1 correspondence may not exist.
+ *
+ * As Marigold and Dandelion cut ropes, they must delete mappings, so that they
+ * remove all the ropes as efficiently as possible (that is, once Marigold has
+ * severed a rope, she wants to communicate that information to Dandelion, so
+ * that he can work on severing different ropes). They will each use NTHREADS
+ * to sever the ropes and udpate the mappings. Dandelion selects ropes to sever
+ * by generating a random balloon_hook index, and Marigold selects ropes by
+ * generating a random ground_stake index.
+ *
+ * Lord FlowerKiller has only a single thread. He is on the ground, so like
+ * Marigold, he selects ropes by their ground_stake index.
+ *
+ * Consider this example:
+ * Marigold randomly selects the rope attached to ground_stake 7 to sever. She
+ * consults the mapping for ground_stake 7, sees that it is still mapped, and
+ * sees that the other end of the rope attaches to balloon_hook 11. To cut the
+ * rope, she must free the mappings in both ground_stake 7 and balloon_hook 11.
+ * Imagine that Dandelion randomly selects balloon_hook index 11 to delete. He
+ * determines that it is still mapped, finds that the corresponding ground_stake
+ * index is 7. He will want to free the mappings in balloon_hook 11 and
+ * ground_stake 7. It's important that Dandelion and Marigold don't get in each
+ * other's way. Worse yet, Lord FlowerKiller might be wreaking havoc with the
+ * same ropes.  For example, imagine that he decides to swap ground_stake 7
+ * with ground_stake 4 at the same time.  Now, all of a sudden, balloon_hook 11
+ * is no longer associated with ground_stake 7 but with ground_stake 4.
+ *
+ * Without proper synchronization, Marigold and Dandelion can encounter:
+ * - a race condition, where multiple threads attempt to sever the same rope at
+ *   the same time (e.g., two different Marigold threads attempt to sever the
+ *   rope attached to ground_stake 7).
+ * - a deadlock, where two threads select the same rope, but accessing it from
+ *   different directions (e.g., Dandelion gets at the rope from balloon_hook 11
+ *   while Marigold gets at the rope from ground_stake 7).
+ *
+ * Your solution must satisfy these conditions:
+ *  - Avoid race conditions.
+ *  - Guarantee no deadlock can occur. Your invariants and comments should
+ *  provide a convincing proof of this.
+ *  HINT: This includes ensuring that Lord FlowerKiller's behavior does not
+ *  cause any race conditions or deadlocks by adding the appropriate
+ *  synchronization to his thread as well.
+ *  HINT: You should insert well-placed thread_yield() calls in your code to
+ *  convince yourself that your synchronization is working.
+ *  - When Marigold and Dandelion select ropes to cut, you may choose to ignore
+ *    a particular choice and generate a new one, however, all mappings must
+ *    eventually be deleted.
+ *  HINT: Use this to your advantage to introduce some asymmetry to the
+ *  problem.
+ *  - Permit multiple Marigold/Dandelion threads to sever ropes concurrently
+ *  (no "big lock" solutions)
+ *
+ */
+
 #include <types.h>
 #include <lib.h>
 #include <thread.h>
